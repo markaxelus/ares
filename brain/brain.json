@@ -49,6 +49,10 @@
     "tool": {
       "label": "Tools",
       "color": "#4f9aa8"
+    },
+    "note": {
+      "label": "Notes",
+      "color": "#9a9ea6"
     }
   },
   "rels": {
@@ -1320,6 +1324,22 @@
       "updated": "2026-09-21",
       "parent": "skills",
       "order": 6
+    },
+    {
+      "id": "inbox",
+      "type": "note",
+      "title": "Inbox",
+      "summary": "Quick notes and unsorted captures. Sorted into groups by `brain.py sort`.",
+      "body": "",
+      "tags": [
+        "inbox"
+      ],
+      "confidence": "high",
+      "source": "system",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "order": 99,
+      "parent": "me"
     }
   ],
   "edges": [
