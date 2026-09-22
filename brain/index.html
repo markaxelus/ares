@@ -398,7 +398,7 @@
   <div class="palette" role="dialog" aria-label="Search and commands">
     <input id="palIn" placeholder="Search nodes, filter, or run a command…" autocomplete="off" spellcheck="false">
     <div class="pal-list" id="palList"></div>
-    <div class="pal-hint"><b>type:</b>goal <b>#</b>tag <b>in:</b>oceanaid <b>is:</b>pinned · group · recent <b>since:</b>2026-09-01 <b>link:</b>id <b>-</b>negate</div>
+    <div class="pal-hint"><b>type:</b>goal <b>#</b>tag <b>in:</b>oceanaid <b>is:</b>pinned · group · recent <b>since:</b>2026-09-01 <b>-</b>negate · plain text becomes a quick note</div>
   </div>
 </div>
 
@@ -1141,6 +1141,20 @@ function renderForm() {
   };
   setTimeout(() => $('input[name=title]', form)?.focus(), 30);
 }
+function addNote(text) {
+  text = text.trim(); if (!text) return null;
+  S.doc.types.note ??= { label: 'Notes', color: '#9a9ea6' };
+  if (!S.byId.has('inbox')) {
+    const inbox = { id: 'inbox', type: 'note', title: 'Inbox', summary: 'Quick notes and unsorted captures. Sorted into groups by brain.py sort.', body: '', tags: ['inbox'], confidence: 'high', source: 'system', created: today(), updated: today(), order: 99 };
+    if (rootId()) inbox.parent = rootId();
+    S.doc.nodes.push(inbox);
+  }
+  const title = text.split('\n')[0].slice(0, 80).replace(/[ .]+$/, '');
+  const node = { id: uniqueId(slug(title) || 'note'), type: 'note', title, summary: text, body: '', tags: ['inbox'], confidence: 'high', source: `note ${today()}`, created: today(), updated: today(), parent: 'inbox' };
+  S.doc.nodes.push(node); S.expanded.add('inbox'); saveExpanded(); rebuild(); markDirty();
+  toast(`Noted. ${S.nodes.filter(n => n.parent === 'inbox').length} in Inbox.`, { action: 'Open', onAction: () => select(node.id, { center: true }) });
+  return node;
+}
 function startCreate(type, parent) {
   if (S.linkFrom) cancelLink();
   S.creating = true; S.editing = false; S.newType = type || (S.sel ? S.byId.get(S.sel).type : 'belief');
@@ -1257,6 +1271,8 @@ function renderStatus() {
   let html = `<span>${shown < total ? `${shown} of ${total}` : total} nodes · ${S.edges.length} links</span>`;
   if (S.filter) html += `<span class="pill" title="Active filter">${esc(S.filter)}<button data-act="clear" title="Clear filter">×</button></span>`;
   if (S.hiddenTypes.size) html += `<span class="pill">${S.hiddenTypes.size} type${S.hiddenTypes.size > 1 ? 's' : ''} hidden<button data-act="types" title="Show all types">×</button></span>`;
+  const inbox = S.nodes.filter(n => n.parent === 'inbox').length;
+  if (inbox && S.filter !== 'in:inbox') html += `<span class="pill" title="Unsorted notes">${inbox} in inbox<button data-act="inbox" title="Show inbox">›</button></span>`;
   if (S.saveError) html += `<span class="save error" title="${esc(S.saveError)}"><i></i>not saved · <button data-act="retry">retry</button></span>`;
   else if (S.saving || S.dirty) html += `<span class="save pending"><i></i>saving…</span>`;
   else if (S.lastSaved) html += `<span class="save"><i></i>saved ${hhmm(S.lastSaved)}</span>`;
@@ -1266,6 +1282,7 @@ function renderStatus() {
     if (b.dataset.act === 'clear') setFilter('');
     if (b.dataset.act === 'types') { S.hiddenTypes.clear(); renderLegend(); refresh(); }
     if (b.dataset.act === 'retry') save();
+    if (b.dataset.act === 'inbox') setFilter('in:inbox');
   });
 }
 function renderList() {
@@ -1338,14 +1355,17 @@ function renderPalette() {
     palItems.push({ kind: 'act', label: `Filter: ${q}`, icon: 'filter', run: () => setFilter(q) });
     if (nodes.length) { palItems.push({ kind: 'group', label: `Nodes · ${nodes.length}` }); for (const n of nodes) palItems.push({ kind: 'node', node: n }); }
     if (cmdMatch.length) { palItems.push({ kind: 'group', label: 'Commands' }); for (const c of cmdMatch.slice(0, 6)) palItems.push({ kind: 'cmd', cmd: c }); }
-    if (!nodes.length && !parseQuery(q).some(t => t.key !== 'text')) palItems.push({ kind: 'act', label: `New node “${q}”`, icon: 'plus', run: () => { startCreate(); setTimeout(() => { const t = $('input[name=title]'); if (t) { t.value = q; t.dispatchEvent(new Event('input')); } }, 60); } });
+    if (!parseQuery(q).some(t => t.key !== 'text')) {
+      palItems.push({ kind: 'act', label: `Quick note: “${trunc(q, 48)}”`, icon: 'note', run: () => addNote(q) });
+      if (!nodes.length) palItems.push({ kind: 'act', label: `New node “${q}”`, icon: 'plus', run: () => { startCreate(); setTimeout(() => { const t = $('input[name=title]'); if (t) { t.value = q; t.dispatchEvent(new Event('input')); } }, 60); } });
+    }
   } else {
     const pinned = S.nodes.filter(n => n.pinned).slice(0, 6);
     if (pinned.length) { palItems.push({ kind: 'group', label: 'Pinned' }); for (const n of pinned) palItems.push({ kind: 'node', node: n }); }
     palItems.push({ kind: 'group', label: 'Commands' }); for (const c of cmdMatch) palItems.push({ kind: 'cmd', cmd: c });
   }
   palHi = palItems.findIndex(i => i.kind !== 'group');
-  const icons = { filter: '<svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>', plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>', cmd: '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>' };
+  const icons = { filter: '<svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>', plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>', note: '<svg viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h6"/></svg>', cmd: '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>' };
   palItems.forEach((it, i) => {
     if (it.kind === 'group') html += `<div class="pal-group eyebrow">${esc(it.label)}</div>`;
     else if (it.kind === 'node') { const path = ancestors(it.node.id).reverse().slice(1).map(a => S.byId.get(a).title).join(' › '); html += `<div class="pal-item ${i === palHi ? 'on' : ''}" data-i="${i}"><i class="dot" style="background:${col(it.node)}"></i><span class="lbl">${esc(it.node.title)}</span><span class="sub">${esc(path || it.node.summary)}</span></div>`; }
