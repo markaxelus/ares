@@ -1,0 +1,1614 @@
+{
+  "meta": {
+    "name": "Second brain",
+    "owner": "Mark Axelus",
+    "version": 3,
+    "updated": "2026-09-21"
+  },
+  "types": {
+    "identity": {
+      "label": "Identity",
+      "color": "ink"
+    },
+    "goal": {
+      "label": "Goals",
+      "color": "#d9764f"
+    },
+    "project": {
+      "label": "Projects",
+      "color": "#3f7fb5"
+    },
+    "belief": {
+      "label": "Beliefs",
+      "color": "#8f6fc4"
+    },
+    "decision": {
+      "label": "Decisions",
+      "color": "#2f9c8a"
+    },
+    "question": {
+      "label": "Open questions",
+      "color": "#e0aa36"
+    },
+    "event": {
+      "label": "Events",
+      "color": "#c95c7c"
+    },
+    "person": {
+      "label": "People",
+      "color": "#6f9b52"
+    },
+    "environment": {
+      "label": "Places & orgs",
+      "color": "#b8864a"
+    },
+    "skill": {
+      "label": "Skills",
+      "color": "#7f8fa6"
+    },
+    "tool": {
+      "label": "Tools",
+      "color": "#4f9aa8"
+    }
+  },
+  "rels": {
+    "leads_to": "leads to",
+    "supports": "supports",
+    "informs": "informs",
+    "tension_with": "in tension with",
+    "constrains": "constrains",
+    "about": "is about",
+    "asks_about": "asks about",
+    "said": "said",
+    "runs": "runs",
+    "uses": "uses",
+    "preceded": "preceded",
+    "relates_to": "relates to",
+    "works_with": "works with",
+    "located_in": "located in",
+    "met_at": "met at",
+    "made_at": "made at",
+    "teaches": "teaches"
+  },
+  "nodes": [
+    {
+      "id": "me",
+      "type": "identity",
+      "title": "Mark Axelus",
+      "summary": "4th-year Computer Science at UVic, Victoria BC. Junior software engineer at OceanAID. Working toward a startup and Next 36.",
+      "body": "- he/him. GitHub markaxelus. markaxelus.com.\n- Full-stack and AI/ML. Best at making things actually work, end to end.\n- Building things since 2019.\n- Hackathons for the fun and the adrenaline: nwHacks every January since 2024, Hack the North 2026.",
+      "tags": [
+        "core"
+      ],
+      "confidence": "high",
+      "source": "portfolio, GitHub, HTN profile, chats",
+      "created": "2026-09-13",
+      "updated": "2026-09-21",
+      "pinned": true
+    },
+    {
+      "id": "startup-path",
+      "type": "goal",
+      "title": "Startup path",
+      "summary": "The plan: get something real going, apply to Next 36 next rotation, do the 8-month cohort in Toronto, then decide. Under all of it: be in a room of truly ambitious people.",
+      "body": "1. Something going. A startup with compounding impact, built at my own pace.\n2. Next 36, next rotation. Proof of being qualified and the door into the right environment.\n3. Toronto, 8 months.\n4. After that: open.\n\nLeaning toward Base 36 as the immediate step. Unconfirmed.",
+      "tags": [
+        "startup",
+        "career"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 1,
+      "pinned": true
+    },
+    {
+      "id": "ambitious-room",
+      "type": "goal",
+      "title": "Be in a room of truly ambitious people",
+      "summary": "The want under everything else. Rooms like Hack the North, where people build things that should exist. Even if an idea fails there, the environment is right.",
+      "body": "- HTN 2026: energized on almost no sleep, wanted to keep building.\n- UVic does not give this. Known for a long time, undeniable after HTN.\n- Routes: a startup that is actually going, Next 36 in Toronto, Waterloo-level people.",
+      "tags": [
+        "environment",
+        "career"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-08-27, 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "startup-path",
+      "order": 1,
+      "pinned": true
+    },
+    {
+      "id": "how-to-get-ahead",
+      "type": "question",
+      "title": "How to get ahead into those environments?",
+      "summary": "Asked right after HTN. Hackathons are not it. Open.",
+      "body": "",
+      "tags": [
+        "career"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "ambitious-room"
+    },
+    {
+      "id": "start-a-startup",
+      "type": "goal",
+      "title": "Start a startup with compounding impact",
+      "summary": "AI-related, hard, unsolved. A small app with a thousand users is not enough. A great product speaks for itself.",
+      "body": "- It should be obvious why it exists.\n- Live in a problem nobody else tackles because it is too hard.\n- Reference point: Arga Labs raised a $10M pre-seed.",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-08-27, 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "startup-path",
+      "order": 2,
+      "pinned": true
+    },
+    {
+      "id": "the-idea",
+      "type": "question",
+      "title": "What is the startup idea?",
+      "summary": "Still missing as of Sept 2026. Wants AI, hard, unsolved, compounding. Ideas so far felt superficial.",
+      "body": "Explored: Reclaim and Telco (legal-complaint tooling; someone else's acquisition play, doubts about retention). The compliance idea in Startup Studio, skeptical.",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-08-27, 2026-09-21",
+      "created": "2026-08-27",
+      "updated": "2026-09-21",
+      "parent": "start-a-startup",
+      "order": 1,
+      "pinned": true
+    },
+    {
+      "id": "no-marine-tech",
+      "type": "decision",
+      "title": "The next startup is not marine tech",
+      "summary": "Do not want to deal with marine tech or copy what OceanAID does.",
+      "body": "",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-08-27",
+      "created": "2026-08-27",
+      "updated": "2026-09-21",
+      "parent": "start-a-startup",
+      "order": 2
+    },
+    {
+      "id": "own-pace",
+      "type": "decision",
+      "title": "Build at my own pace, not the class's",
+      "summary": "Not waiting for the Startup Studio team. Ship on my own timeline.",
+      "body": "",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "start-a-startup",
+      "order": 3
+    },
+    {
+      "id": "find-cofounders",
+      "type": "goal",
+      "title": "Find co-founders",
+      "summary": "The biggest thing. Ambitious people who want to go far and keep building past the weekend.",
+      "body": "- HTN 2026 was a co-founder search first: 'even if we don't win I'd be walking out with 3 co-founders.'\n- Team shape wanted: 3 (one woman, one man) or 4 (two and two).\n- Looking for people who get excited by ambitious ideas, are easy to be around, open, take ownership, communicate.",
+      "tags": [
+        "startup",
+        "people"
+      ],
+      "confidence": "high",
+      "source": "HTN profile, chats 2026-08-30 and 2026-09-04",
+      "created": "2026-08-30",
+      "updated": "2026-09-21",
+      "parent": "startup-path",
+      "order": 3,
+      "pinned": true
+    },
+    {
+      "id": "cofounders-over-demos",
+      "type": "belief",
+      "title": "Co-founders over demos",
+      "summary": "Staying power past the weekend beats weekend execution speed. Ambition is the filter.",
+      "body": "",
+      "tags": [
+        "startup",
+        "people"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-08-30",
+      "created": "2026-08-30",
+      "updated": "2026-09-21",
+      "parent": "find-cofounders",
+      "order": 1
+    },
+    {
+      "id": "htn-shortlist",
+      "type": "person",
+      "title": "People I wanted to team with at HTN",
+      "summary": "From the HTN teammate Slack intros, Sept 5, 2026.",
+      "body": "- Eric Kang: uwu bot (~1.5M users), YC Startup School, Waterloo 4th year.\n- Michael Zoubkoff: Montreal. Rubicon (agent payments) and Cold Vision (prediction-markets terminal), both live. Two cash prizes at hackathons that month.\n- Moe Amadou: 4B Waterloo CS, past HTN organizer, worked at Figma. Relocating to France.\n- Emilien Lavallee: incoming Waterloo, Botpress intern, Rust and Lisp side projects.\n- Asma Ahmed Syrotkin: Sheridan, several hackathon placements.",
+      "tags": [
+        "people",
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-05",
+      "created": "2026-09-05",
+      "updated": "2026-09-05",
+      "parent": "find-cofounders",
+      "order": 2
+    },
+    {
+      "id": "sahaj",
+      "type": "person",
+      "title": "Sahaj",
+      "summary": "Collaborator on shared projects. Waits to be told, gives superficial input, absent on the VIBE work. Lautaro said on a Sept 3 call that he was not helping.",
+      "body": "",
+      "tags": [
+        "people"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-09-03 to 2026-09-09",
+      "created": "2026-09-03",
+      "updated": "2026-09-09",
+      "parent": "find-cofounders",
+      "order": 3
+    },
+    {
+      "id": "drop-sahaj",
+      "type": "decision",
+      "title": "Stop building with Sahaj",
+      "summary": "'Drop him 100%' as of 2026-09-08. The direct conversation had not happened as of Sept 9.",
+      "body": "- Same pattern on our own projects: after a work session, nothing happens until he is told what to do.\n- 2026-08-27: 'my co-founder is not a reliable person', and no plan to continue that relationship.",
+      "tags": [
+        "people",
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-08-27 to 2026-09-09",
+      "created": "2026-09-03",
+      "updated": "2026-09-09",
+      "parent": "find-cofounders",
+      "order": 4
+    },
+    {
+      "id": "get-into-next-36",
+      "type": "goal",
+      "title": "Get into Next 36",
+      "summary": "Apply next rotation with something already going. Proof of being qualified, and the door into the right environment.",
+      "body": "Selection criteria unknown so far.",
+      "tags": [
+        "startup",
+        "career",
+        "next-36"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "startup-path",
+      "order": 4,
+      "pinned": true
+    },
+    {
+      "id": "next-36-program",
+      "type": "environment",
+      "title": "Next 36",
+      "summary": "Founder program. 8-month cohort in Toronto. Selection criteria unknown.",
+      "body": "To confirm: format, dates, application window.",
+      "tags": [
+        "next-36",
+        "startup"
+      ],
+      "confidence": "medium",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 1
+    },
+    {
+      "id": "base-36",
+      "type": "environment",
+      "title": "Base 36",
+      "summary": "Candidate next step before Next 36. Unconfirmed.",
+      "body": "",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "low",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 2
+    },
+    {
+      "id": "toronto",
+      "type": "environment",
+      "title": "Toronto",
+      "summary": "Where the Next 36 cohort happens. Wanted to explore it during the HTN trip.",
+      "body": "",
+      "tags": [],
+      "confidence": "medium",
+      "source": "chats",
+      "created": "2026-08-27",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 3
+    },
+    {
+      "id": "what-to-optimize-for",
+      "type": "question",
+      "title": "What to optimize for right now?",
+      "summary": "Leaning toward Base 36 as the next step, unsure. The rest of the plan hangs on this.",
+      "body": "",
+      "tags": [
+        "startup",
+        "career"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 4,
+      "pinned": true
+    },
+    {
+      "id": "what-is-base-36",
+      "type": "question",
+      "title": "What exactly is Base 36?",
+      "summary": "Confirm what it is: dates, requirements, how it leads into Next 36.",
+      "body": "",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "low",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 5
+    },
+    {
+      "id": "what-next-36-wants",
+      "type": "question",
+      "title": "What does Next 36 select for?",
+      "summary": "Unknown. Need to find out before applying.",
+      "body": "",
+      "tags": [
+        "next-36"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 6
+    },
+    {
+      "id": "after-toronto",
+      "type": "question",
+      "title": "What comes after Toronto?",
+      "summary": "Open.",
+      "body": "",
+      "tags": [
+        "career"
+      ],
+      "confidence": "medium",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "get-into-next-36",
+      "order": 7
+    },
+    {
+      "id": "oceanaid",
+      "type": "environment",
+      "title": "OceanAID",
+      "summary": "Marine-tech startup in Victoria. Junior Software Engineer, there by May 2026 (start date not recorded). Built and run the production system end to end.",
+      "body": "- Product: Marlin, for anglers and boats. An edge box, a mobile app, an on-device assistant.\n- Org repos active Sept 2026: marlin-edge, marlinbot, marlin-mobile, sensor_fusion, oceanaid-sdk, satellite-maps, oceanhub, airflow-dags, oceanaid-frontier-model.\n- The next startup will not be marine tech.",
+      "tags": [
+        "work",
+        "marine"
+      ],
+      "confidence": "high",
+      "source": "GitHub org, portfolio, email 2026-09-01",
+      "created": "2026-05-01",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 2
+    },
+    {
+      "id": "marlin",
+      "type": "project",
+      "title": "Marlin",
+      "summary": "OceanAID's product line: the Marlin edge box, the Marlin Connect app, and MarlinBot.",
+      "body": "Works with Lowrance and Simrad displays. Garmin has been the persistent source of bugs, still unsolved as of Aug 2026.",
+      "tags": [
+        "oceanaid",
+        "marine",
+        "work"
+      ],
+      "confidence": "high",
+      "source": "GitHub org, work folder, chat 2026-08-27",
+      "created": "2026-05-01",
+      "updated": "2026-09-21",
+      "parent": "oceanaid",
+      "order": 2
+    },
+    {
+      "id": "marlin-edge",
+      "type": "project",
+      "title": "Marlin edge box",
+      "summary": "Jetson Orin NX on the boat running the marlin-edge app: sonar and video computer vision, sensor fusion, offline-first telemetry.",
+      "body": "",
+      "tags": [
+        "marine",
+        "edge"
+      ],
+      "confidence": "high",
+      "source": "GitHub org, marlinbot README",
+      "created": "2026-05-01",
+      "updated": "2026-09-21",
+      "parent": "marlin",
+      "order": 1
+    },
+    {
+      "id": "marlin-connect",
+      "type": "project",
+      "title": "Marlin Connect app",
+      "summary": "iOS app for the edge box and MarlinBot. Submitted to App Store review 2026-08-22.",
+      "body": "",
+      "tags": [
+        "marine",
+        "mobile"
+      ],
+      "confidence": "high",
+      "source": "App Store review email",
+      "created": "2026-08-22",
+      "updated": "2026-08-22",
+      "parent": "marlin",
+      "order": 2
+    },
+    {
+      "id": "marlinbot",
+      "type": "project",
+      "title": "MarlinBot",
+      "summary": "On-device LLM assistant for anglers. Ollama with Nemotron-4B on the Jetson, a chat API, MCP tools over boat data, full-text RAG.",
+      "body": "- Phases done by May 2026: spike, chat MVP, MCP tools, streaming UI, RAG (embeddings deferred).\n- Researched CHS NONNA bathymetry and Canadian tide data for it, Sept 2026.",
+      "tags": [
+        "marine",
+        "ai",
+        "edge"
+      ],
+      "confidence": "high",
+      "source": "work folder, claude_reports",
+      "created": "2026-05-06",
+      "updated": "2026-09-21",
+      "parent": "marlin",
+      "order": 3
+    },
+    {
+      "id": "dockside",
+      "type": "project",
+      "title": "Dockside",
+      "summary": "A miniature Marlin Box: edge computer vision for marine debris with cloud training and offline-first telemetry. Built to learn Ultralytics, CUDA, Jetson and AWS by rebuilding OceanAID's architecture on a laptop.",
+      "body": "Roboflow dataset, YOLOv8 training on EC2, TensorRT edge inference, SQLite offline buffer, Lambda and DynamoDB, dashboard. Five checkpoints.",
+      "tags": [
+        "learning",
+        "marine",
+        "ml"
+      ],
+      "confidence": "medium",
+      "source": "local repo",
+      "created": "2026-05-01",
+      "updated": "2026-09-21",
+      "parent": "oceanaid",
+      "order": 3
+    },
+    {
+      "id": "uvic",
+      "type": "environment",
+      "title": "University of Victoria",
+      "summary": "4th-year Computer Science. The environment to leave.",
+      "body": "- AI Systems Developer for UVic, 2025 to 2026.\n- Developer for the Environmental Engineering Club, 2024.\n- Courses on disk: CSC 225, 230, 305, 330, 349, 361; SENG 310, 474; MATH 202; STAT 260.",
+      "tags": [
+        "uvic"
+      ],
+      "confidence": "high",
+      "source": "chats, GitHub, Documents",
+      "created": "2026-09-13",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 3
+    },
+    {
+      "id": "uvic-thinks-small",
+      "type": "belief",
+      "title": "UVic's builder scene thinks small",
+      "summary": "A builder community exists and some people build, but the scale of vision is small. Example: a scheduling tool built only to avoid paying for a calendar app.",
+      "body": "",
+      "tags": [
+        "uvic"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "uvic",
+      "order": 1
+    },
+    {
+      "id": "startup-studio",
+      "type": "environment",
+      "title": "Startup Studio (SENG 455 / BCOM 450)",
+      "summary": "UVic course, Fall 2026. Mixed software, CS and business teams, local founders, mentors and investors, a product built fast with generative AI. startup-studio.ai.",
+      "body": "- Got in on a waiver after emailing Peggy Storey. First class Sept 11.\n- Currently on the compliance team. Skeptical of the domain.\n- Building at my own pace regardless of the team.",
+      "tags": [
+        "uvic",
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "emails and chats, Sept 2026",
+      "created": "2026-09-01",
+      "updated": "2026-09-22",
+      "parent": "uvic",
+      "order": 2
+    },
+    {
+      "id": "startup-studio-start",
+      "type": "event",
+      "title": "Startup Studio starts",
+      "summary": "Sept 11, 2026. Got in after asking for a prerequisite waiver. First class: eight-plus founders, ideation. BRNKL's founder story was one of them.",
+      "body": "",
+      "tags": [
+        "uvic",
+        "startup"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-09-01 to 2026-09-11",
+      "created": "2026-09-11",
+      "updated": "2026-09-11",
+      "parent": "startup-studio",
+      "order": 1
+    },
+    {
+      "id": "peggy-storey",
+      "type": "person",
+      "title": "Margaret-Anne (Peggy) Storey",
+      "summary": "UVic professor. Runs Startup Studio with Claudia Smith. Granted the prerequisite waiver.",
+      "body": "",
+      "tags": [
+        "uvic"
+      ],
+      "confidence": "high",
+      "source": "emails, Sept 2026",
+      "created": "2026-09-01",
+      "updated": "2026-09-21",
+      "parent": "startup-studio",
+      "order": 2
+    },
+    {
+      "id": "compliance-team",
+      "type": "project",
+      "title": "Compliance team",
+      "summary": "The Startup Studio team I landed on after missing a class for HTN: a compliance-tooling idea. Skeptical of the domain.",
+      "body": "Details of the idea not yet recorded.",
+      "tags": [
+        "startup",
+        "uvic"
+      ],
+      "confidence": "medium",
+      "source": "chat 2026-09-22",
+      "created": "2026-09-22",
+      "updated": "2026-09-22",
+      "parent": "startup-studio",
+      "order": 3
+    },
+    {
+      "id": "compliance-is-a-trap",
+      "type": "belief",
+      "title": "Compliance tooling is a bad fit for a student team",
+      "summary": "Huge market, but trust-heavy with long sales cycles. Needs LOIs and a funnel to regulated customers. Drata and Vanta's founders had that access, not domain expertise. SOC 2 is crowded.",
+      "body": "",
+      "tags": [
+        "startup"
+      ],
+      "confidence": "medium",
+      "source": "chat 2026-09-22",
+      "created": "2026-09-22",
+      "updated": "2026-09-22",
+      "parent": "compliance-team",
+      "order": 1
+    },
+    {
+      "id": "compliance-pushback",
+      "type": "question",
+      "title": "Push back on the compliance idea?",
+      "summary": "Drafting the message with evidence, 2026-09-22.",
+      "body": "",
+      "tags": [
+        "startup",
+        "uvic"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-22",
+      "created": "2026-09-22",
+      "updated": "2026-09-22",
+      "parent": "compliance-team",
+      "order": 2
+    },
+    {
+      "id": "uvic-chatbot",
+      "type": "project",
+      "title": "UVic chatbot",
+      "summary": "AI Systems Developer at the University of Victoria, 2025 to 2026. Built a UVic chatbot; a handoff document (SOSC) is on disk.",
+      "body": "",
+      "tags": [
+        "uvic",
+        "ai",
+        "work"
+      ],
+      "confidence": "medium",
+      "source": "portfolio, Documents",
+      "created": "2025-09-01",
+      "updated": "2026-09-21",
+      "parent": "uvic",
+      "order": 3
+    },
+    {
+      "id": "uveec-site",
+      "type": "project",
+      "title": "UVEEC website",
+      "summary": "Rebuilt the UVic Environmental Engineering Club's site: dynamic teams, mobile-first, maintainable. Developer for the club, 2024.",
+      "body": "",
+      "tags": [
+        "uvic",
+        "web"
+      ],
+      "confidence": "high",
+      "source": "portfolio, GitHub",
+      "created": "2024-06-30",
+      "updated": "2026-09-21",
+      "parent": "uvic",
+      "order": 4
+    },
+    {
+      "id": "hackathons",
+      "type": "event",
+      "title": "Hackathons",
+      "summary": "For the fun and the adrenaline. nwHacks every January since 2024, Hack the North 2026. Not the way to get ahead.",
+      "body": "",
+      "tags": [
+        "hackathon"
+      ],
+      "confidence": "high",
+      "source": "chats, GitHub",
+      "created": "2024-01-18",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 4
+    },
+    {
+      "id": "htn-2026",
+      "type": "event",
+      "title": "Hack the North 2026",
+      "summary": "Waterloo, Sept 18 to 20, 2026. Flew Victoria to Toronto. Cloth-ee came out of the weekend; in my words we basically didn't make anything. The room was the point: energized on no sleep, wanted to keep building.",
+      "body": "- Went in wanting to win and to leave with co-founders.\n- Good conversations with Vultr Financial and Dominion Dynamics.\n- Compared to nwHacks: 'really, really different.'\n- Missed a Startup Studio class for it.",
+      "tags": [
+        "hackathon",
+        "waterloo"
+      ],
+      "confidence": "high",
+      "source": "chats",
+      "created": "2026-09-18",
+      "updated": "2026-09-21",
+      "parent": "hackathons",
+      "order": 1,
+      "pinned": true
+    },
+    {
+      "id": "cloth-ee",
+      "type": "project",
+      "title": "Cloth-ee",
+      "summary": "A transparent clothing-behaviour simulation: forty synthetic residents respond to price, trends and social signals, and every purchase, wear, resale and disposal becomes traceable. 'See how influence becomes waste.'",
+      "body": "Live at cloth-ee.vercel.app. Built Sept 19 to 20, 2026.",
+      "tags": [
+        "hackathon"
+      ],
+      "confidence": "high",
+      "source": "GitHub",
+      "created": "2026-09-19",
+      "updated": "2026-09-21",
+      "parent": "htn-2026",
+      "order": 1
+    },
+    {
+      "id": "htn-teammate",
+      "type": "person",
+      "title": "HTN teammate (incoming at Tesla)",
+      "summary": "Teammate at Hack the North 2026. Said hackathons are not the way to get ahead.",
+      "body": "Name not recorded.",
+      "tags": [
+        "waterloo"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "htn-2026",
+      "order": 2
+    },
+    {
+      "id": "waterloo",
+      "type": "environment",
+      "title": "Waterloo",
+      "summary": "The benchmark. People build things, and that is why the things exist.",
+      "body": "",
+      "tags": [
+        "waterloo"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "htn-2026",
+      "order": 3
+    },
+    {
+      "id": "things-that-should-exist",
+      "type": "belief",
+      "title": "Build things that obviously should exist",
+      "summary": "What set Hack the North apart: projects that were more challenging, more exciting, and made sense to exist. Genuinely useful things that move people forward.",
+      "body": "One or two HTN projects were only cool. Most were different in kind. This is the bar.",
+      "tags": [
+        "values",
+        "waterloo"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "htn-2026",
+      "order": 4,
+      "pinned": true
+    },
+    {
+      "id": "energy-from-ambitious-rooms",
+      "type": "belief",
+      "title": "Ambitious rooms are the energy source",
+      "summary": "Energized at HTN on barely any sleep. nwHacks gave adrenaline. HTN was different in kind.",
+      "body": "",
+      "tags": [
+        "self-knowledge"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "htn-2026",
+      "order": 5
+    },
+    {
+      "id": "hackathons-not-the-way",
+      "type": "belief",
+      "title": "Hackathons are not how to get ahead",
+      "summary": "They are for fun and adrenaline. An HTN teammate, incoming at Tesla, said the same.",
+      "body": "",
+      "tags": [
+        "career"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "htn-2026",
+      "order": 6
+    },
+    {
+      "id": "nwhacks",
+      "type": "event",
+      "title": "nwHacks 2024, 2025, 2026",
+      "summary": "Vancouver, every January. 2024: first hackathon (EcoEats). 2025: Synapse, team of two. 2026: an agentic batching engine on the Gemini API. Adrenaline, without the HTN energy.",
+      "body": "",
+      "tags": [
+        "hackathon"
+      ],
+      "confidence": "medium",
+      "source": "GitHub, portfolio, chat 2026-09-21",
+      "created": "2024-01-18",
+      "updated": "2026-01-17",
+      "parent": "hackathons",
+      "order": 2
+    },
+    {
+      "id": "projects",
+      "type": "project",
+      "title": "Things I built",
+      "summary": "Mostly solo, mostly shipped. Delivered since 2019.",
+      "body": "- 2024: UVEEC site (under UVic).\n- Jan 2025: Synapse.\n- 2025: Relay.\n- Jun 2025 on: markaxelus.com.\n- Jan 2026: signal-zero.\n- May 2026: Reclaim, then Telco.\n- Jun 2026: Chronos.\n- Aug to Sep 2026: VIBE (under Victoria network).\n- Sep 2026: Cloth-ee (under Hack the North), Ares.",
+      "tags": [
+        "projects"
+      ],
+      "confidence": "high",
+      "source": "GitHub, portfolio",
+      "created": "2024-01-01",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 5
+    },
+    {
+      "id": "portfolio",
+      "type": "project",
+      "title": "markaxelus.com",
+      "summary": "Personal site in Next.js. A print-shop identity: the front page is the delivered work, a hidden desk page is the mess behind it.",
+      "body": "- Hero: 'Mark & / From the desk'. 'Delivered since 2019.'\n- Built through July 2026 across many prototype branches, against an Awwwards-level bar.\n- Works listed: UVEEC site rebuild, Relay, this site, Synapse.",
+      "tags": [
+        "design",
+        "web"
+      ],
+      "confidence": "high",
+      "source": "repo",
+      "created": "2025-06-15",
+      "updated": "2026-07-19",
+      "parent": "projects",
+      "order": 1
+    },
+    {
+      "id": "authenticity",
+      "type": "belief",
+      "title": "Authenticity over professionalism",
+      "summary": "The portfolio thesis: despite the mess of the work and the mind, things get delivered.",
+      "body": "",
+      "tags": [
+        "values"
+      ],
+      "confidence": "high",
+      "source": "portfolio",
+      "created": "2026-07-11",
+      "updated": "2026-09-21",
+      "parent": "portfolio",
+      "order": 1
+    },
+    {
+      "id": "chronos",
+      "type": "project",
+      "title": "Chronos",
+      "summary": "A personal operating system: sits in the background, watches patterns, adjusts plans. Next.js, pnpm and Turborepo monorepo.",
+      "body": "- Built June 2026. Roughly 20% of the full vision by late June.\n- Wearable and calendar adapters, a sessions ledger, /today, /digest, /coach, an Obsidian package, local Ollama models.\n- Dogfooded from 2026-06-28.",
+      "tags": [
+        "personal-tools",
+        "ai"
+      ],
+      "confidence": "high",
+      "source": "repo and chats",
+      "created": "2026-06-09",
+      "updated": "2026-06-28",
+      "parent": "projects",
+      "order": 2
+    },
+    {
+      "id": "telco",
+      "type": "project",
+      "title": "CCTS-assistant (Telco)",
+      "summary": "AI-assisted intake, form completion and correspondence for complaints to the CCTS, Canada's telecom ombudsman. Free plain-language read of the dispute, pay to generate the complaint package.",
+      "body": "- Private repo, May to June 2026. 49 tickets across Epics 0 to 10.\n- Grew out of Reclaim. The original pitch (someone else's) was to get acquired. Open doubts about retention and a one-time-use product.\n- TypeScript monorepo, Postgres with pgvector, a Python plane for RAG.",
+      "tags": [
+        "startup",
+        "legal",
+        "ai"
+      ],
+      "confidence": "high",
+      "source": "repo and chats",
+      "created": "2026-05-18",
+      "updated": "2026-06-24",
+      "parent": "projects",
+      "order": 3
+    },
+    {
+      "id": "reclaim",
+      "type": "project",
+      "title": "Reclaim",
+      "summary": "Working name for an AI-assisted intake and evidence-packaging layer for denied long-term disability claims. Stage 0 backend plus a full document set: vision, PRD, business model, go-to-market, architecture, roadmap.",
+      "body": "Monorepo: Fastify API, Next.js surfaces, Python core, Postgres-backed workflow engine. Came before Telco.",
+      "tags": [
+        "startup",
+        "legal",
+        "ai"
+      ],
+      "confidence": "medium",
+      "source": "local repo",
+      "created": "2026-05-01",
+      "updated": "2026-09-21",
+      "parent": "telco",
+      "order": 1
+    },
+    {
+      "id": "signal-zero",
+      "type": "project",
+      "title": "signal-zero",
+      "summary": "Offline-first wildfire mapping for field crews without cell signal. React and Mapbox GL, IndexedDB and service workers, Lambda and DynamoDB geohashing, NASA VIIRS data. Built in 24 hours, January 2026.",
+      "body": "Came from researching Hummingbird Drones' wildfire operations in BC. 22,000+ hotspots rendered without lag.",
+      "tags": [
+        "geo"
+      ],
+      "confidence": "high",
+      "source": "repo",
+      "created": "2026-01-29",
+      "updated": "2026-09-21",
+      "parent": "projects",
+      "order": 4
+    },
+    {
+      "id": "synapse",
+      "type": "project",
+      "title": "Synapse",
+      "summary": "nwHacks 2025, team of two. PDFs become editable diagrams. GPT-4 and serverless, under five seconds.",
+      "body": "",
+      "tags": [
+        "hackathon"
+      ],
+      "confidence": "high",
+      "source": "portfolio",
+      "created": "2025-01-18",
+      "updated": "2026-09-21",
+      "parent": "projects",
+      "order": 5
+    },
+    {
+      "id": "relay",
+      "type": "project",
+      "title": "Relay",
+      "summary": "Project-management app built for real collaboration: real-time updates, drag-and-drop, Postgres with Prisma.",
+      "body": "",
+      "tags": [
+        "web"
+      ],
+      "confidence": "high",
+      "source": "portfolio",
+      "created": "2025-01-01",
+      "updated": "2026-09-21",
+      "parent": "projects",
+      "order": 6
+    },
+    {
+      "id": "victoria-network",
+      "type": "environment",
+      "title": "Victoria network",
+      "summary": "The local ecosystem around Lautaro's VIBE summit and BuilderVault hackathons: VIATEC, Tenfold, Launch BC, Alacrity, WUTIF, VANTEC, New Ventures BC, Victoria Data Society. BuilderVault events in March 2026: the Victoria Royals one (Arenaflow) and a healthcare AI one.",
+      "body": "",
+      "tags": [
+        "victoria",
+        "network"
+      ],
+      "confidence": "medium",
+      "source": "VIBE work",
+      "created": "2026-08-14",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 6
+    },
+    {
+      "id": "lautaro",
+      "type": "person",
+      "title": "Lautaro Cepeda",
+      "summary": "Runs the VIBE summit and BuilderVault, a recurring AI hackathon series in Victoria. Client and collaborator. Reviews over WhatsApp and calls.",
+      "body": "",
+      "tags": [
+        "victoria",
+        "network"
+      ],
+      "confidence": "high",
+      "source": "chats, mamuk-ai repo",
+      "created": "2026-08-14",
+      "updated": "2026-09-21",
+      "parent": "victoria-network",
+      "order": 1
+    },
+    {
+      "id": "vibe",
+      "type": "project",
+      "title": "VIBE summit work",
+      "summary": "Client work for the Vancouver Island Business Ecosystem summit, Aug 14 to Sep 9, 2026: the site, LinkedIn banners, social templates and a template maker, all on a riso-style dither engine built from scratch.",
+      "body": "- Judges: Owen Madrick (Alacrity), K Krasnow Waterman (TComplete), Aaron Stuart (VANTEC), Sanket Mittal (Althra). $10,000 prize.\n- Attendees include Redbrick, Certn, Alacrity, WUTIF, VANTEC, New Ventures BC, Launch BC, Climate Door, Althra. Partners VIATEC, Tenfold, Victoria Data Society.",
+      "tags": [
+        "client",
+        "design",
+        "victoria"
+      ],
+      "confidence": "high",
+      "source": "repo and chats",
+      "created": "2026-08-14",
+      "updated": "2026-09-09",
+      "parent": "victoria-network",
+      "order": 2
+    },
+    {
+      "id": "vibe-site",
+      "type": "project",
+      "title": "vi.business site",
+      "summary": "Eight sections on a riso dither identity: cloud hero, ecosystem, mechanism, rooms, the $10,000 prize, the room, colophon. Three-tier application popup ($400, $500, $1,000) wired to email.",
+      "body": "The live site was edited after handoff; pulled and committed Sept 9.",
+      "tags": [
+        "design",
+        "web"
+      ],
+      "confidence": "high",
+      "source": "repo",
+      "created": "2026-08-14",
+      "updated": "2026-09-09",
+      "parent": "vibe",
+      "order": 1
+    },
+    {
+      "id": "vibe-assets",
+      "type": "project",
+      "title": "Banners and social templates",
+      "summary": "LinkedIn banners (personal 1584x396, company 1128x191), 18 social template plates, a parametric 'make your own' template builder, and a standalone ditherizer for Lautaro's team.",
+      "body": "",
+      "tags": [
+        "design"
+      ],
+      "confidence": "high",
+      "source": "repo",
+      "created": "2026-09-02",
+      "updated": "2026-09-09",
+      "parent": "vibe",
+      "order": 2
+    },
+    {
+      "id": "vibe-summit-day",
+      "type": "event",
+      "title": "VIBE summit",
+      "summary": "November 17, 2026, Victoria. Upcoming.",
+      "body": "",
+      "tags": [
+        "victoria"
+      ],
+      "confidence": "high",
+      "source": "VIBE brief",
+      "created": "2026-08-14",
+      "updated": "2026-09-21",
+      "parent": "vibe",
+      "order": 3
+    },
+    {
+      "id": "ares",
+      "type": "project",
+      "title": "Ares",
+      "summary": "Always-on personal assistant for the Windows PC. Another me: changes settings, opens apps and tabs, finds things, does what it is asked.",
+      "body": "- Repo markaxelus/ares. Started 2026-09-13.\n- Constraints: useful every day. As close to $0 running cost as possible.\n- Language: Python, decided 2026-09-13.\n- Open: the foundation and model provider. Local qwen3.5:9b through Ollama, the existing Claude subscription for big tasks, or a capped API key.",
+      "tags": [
+        "ares",
+        "agent"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-09-13, 2026-09-21",
+      "created": "2026-09-13",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 7,
+      "pinned": true
+    },
+    {
+      "id": "second-brain",
+      "type": "project",
+      "title": "Second brain",
+      "summary": "This graph. Everything known about me, grouped and queryable: brain.json, a Python CLI and server, this UI.",
+      "body": "Added 2026-09-21.",
+      "tags": [
+        "ares",
+        "memory"
+      ],
+      "confidence": "high",
+      "source": "built 2026-09-21",
+      "created": "2026-09-21",
+      "updated": "2026-09-21",
+      "parent": "ares",
+      "order": 1
+    },
+    {
+      "id": "pc",
+      "type": "tool",
+      "title": "Desktop PC",
+      "summary": "Windows 11. i7-13700K, 32 GB RAM, Radeon RX 7700 XT 12 GB. Ollama installed; qwen3.5:9b is the realistic local model.",
+      "body": "",
+      "tags": [
+        "hardware"
+      ],
+      "confidence": "high",
+      "source": "chat 2026-09-13",
+      "created": "2026-09-13",
+      "updated": "2026-09-13",
+      "parent": "ares",
+      "order": 2
+    },
+    {
+      "id": "self",
+      "type": "belief",
+      "title": "Self-knowledge",
+      "summary": "What I know about how I work.",
+      "body": "- Perseverance over raw technical ability.\n- Energized by ambitious rooms.\n- I do the work without being told.\n- Hard to frame what I have done.",
+      "tags": [
+        "self-knowledge"
+      ],
+      "confidence": "high",
+      "source": "chats Aug to Sept 2026",
+      "created": "2026-08-27",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 8
+    },
+    {
+      "id": "perseverance",
+      "type": "belief",
+      "title": "Perseverance is the edge",
+      "summary": "'I'll work harder than anyone because I don't have anything.' Technical ability is not the differentiator yet. Wanting things to work, and doing whatever it takes, is.",
+      "body": "",
+      "tags": [
+        "self-knowledge"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-08-27, 2026-09-04",
+      "created": "2026-08-27",
+      "updated": "2026-09-21",
+      "parent": "self",
+      "order": 1
+    },
+    {
+      "id": "bias-to-action",
+      "type": "belief",
+      "title": "I do the work without being told",
+      "summary": "Rely on me to do the things no one else wants to do, or figure out what no one knows how to do. On shared projects I end up doing all the work.",
+      "body": "",
+      "tags": [
+        "self-knowledge"
+      ],
+      "confidence": "high",
+      "source": "HTN profile, chats Sept 2026",
+      "created": "2026-08-30",
+      "updated": "2026-09-21",
+      "parent": "self",
+      "order": 2
+    },
+    {
+      "id": "how-to-frame-myself",
+      "type": "question",
+      "title": "How to frame what I have done?",
+      "summary": "Hard to collect the work and present it convincingly. The resume does not look like the Waterloo people's. What I have to offer, and what I look for in others, is not yet clear to me.",
+      "body": "",
+      "tags": [
+        "career",
+        "self-knowledge"
+      ],
+      "confidence": "high",
+      "source": "chats 2026-08-30, 2026-09-04",
+      "created": "2026-08-30",
+      "updated": "2026-09-21",
+      "parent": "self",
+      "order": 3
+    },
+    {
+      "id": "skills",
+      "type": "skill",
+      "title": "Skills",
+      "summary": "Full-stack and AI/ML, with design taste. TypeScript first, Python for AI and edge work.",
+      "body": "",
+      "tags": [
+        "stack"
+      ],
+      "confidence": "high",
+      "source": "portfolio, repos, HTN profile",
+      "created": "2026-09-13",
+      "updated": "2026-09-21",
+      "parent": "me",
+      "order": 9
+    },
+    {
+      "id": "skill-web",
+      "type": "skill",
+      "title": "TypeScript, Next.js, React",
+      "summary": "Primary stack. Node, Express, Postgres with Prisma, Tailwind, GSAP, pnpm and Turborepo monorepos.",
+      "body": "",
+      "tags": [
+        "stack"
+      ],
+      "confidence": "high",
+      "source": "portfolio, repos",
+      "created": "2026-09-13",
+      "updated": "2026-09-21",
+      "parent": "skills",
+      "order": 1
+    },
+    {
+      "id": "skill-ai",
+      "type": "skill",
+      "title": "Python, AI/ML, agents",
+      "summary": "FastAPI, Ultralytics and YOLO, RAG with pgvector, Ollama local models, MCP tools, Gemini and GPT integrations. Ranked first on the HTN profile.",
+      "body": "",
+      "tags": [
+        "stack",
+        "ai"
+      ],
+      "confidence": "high",
+      "source": "HTN profile, repos",
+      "created": "2026-08-30",
+      "updated": "2026-09-21",
+      "parent": "skills",
+      "order": 2
+    },
+    {
+      "id": "skill-design",
+      "type": "skill",
+      "title": "Design and motion",
+      "summary": "Typography, print and riso identities, custom canvas dither engines. Taste: high-end, abstract, restrained. Everything placed with intent, nothing decorative. Awwwards-level bar.",
+      "body": "Fonts on disk: Clash Grotesk, Stardom, Telma.",
+      "tags": [
+        "design"
+      ],
+      "confidence": "high",
+      "source": "portfolio, VIBE",
+      "created": "2026-07-11",
+      "updated": "2026-09-21",
+      "parent": "skills",
+      "order": 3
+    },
+    {
+      "id": "skill-cloud",
+      "type": "skill",
+      "title": "AWS, serverless, Docker",
+      "summary": "Lambda, DynamoDB geohashing, EC2 GPU training, S3, Docker, GitHub Actions, Cypress and Playwright verification.",
+      "body": "",
+      "tags": [
+        "stack"
+      ],
+      "confidence": "high",
+      "source": "repos",
+      "created": "2026-01-29",
+      "updated": "2026-09-21",
+      "parent": "skills",
+      "order": 4
+    },
+    {
+      "id": "skill-edge",
+      "type": "skill",
+      "title": "Edge and embedded",
+      "summary": "Jetson Orin NX deployment, TensorRT, on-device LLMs. Atmel and Microchip Studio on disk. Embedded systems listed as an HTN interest.",
+      "body": "",
+      "tags": [
+        "stack",
+        "hardware"
+      ],
+      "confidence": "medium",
+      "source": "work, HTN profile",
+      "created": "2026-08-30",
+      "updated": "2026-09-21",
+      "parent": "skills",
+      "order": 5
+    },
+    {
+      "id": "skill-cpp",
+      "type": "skill",
+      "title": "C++, graphics, competitive programming",
+      "summary": "Ray tracer and software rasterizer (Jan 2026). Codeforces solutions (May 2026).",
+      "body": "",
+      "tags": [
+        "stack"
+      ],
+      "confidence": "medium",
+      "source": "repos",
+      "created": "2026-01-28",
+      "updated": "2026-09-21",
+      "parent": "skills",
+      "order": 6
+    }
+  ],
+  "edges": [
+    {
+      "id": "start-a-startup--leads_to--get-into-next-36",
+      "from": "start-a-startup",
+      "to": "get-into-next-36",
+      "rel": "leads_to",
+      "note": "Something going before applying."
+    },
+    {
+      "id": "get-into-next-36--leads_to--ambitious-room",
+      "from": "get-into-next-36",
+      "to": "ambitious-room",
+      "rel": "leads_to"
+    },
+    {
+      "id": "find-cofounders--leads_to--start-a-startup",
+      "from": "find-cofounders",
+      "to": "start-a-startup",
+      "rel": "leads_to"
+    },
+    {
+      "id": "base-36--leads_to--get-into-next-36",
+      "from": "base-36",
+      "to": "get-into-next-36",
+      "rel": "leads_to",
+      "note": "My sketch, unconfirmed."
+    },
+    {
+      "id": "next-36-program--located_in--toronto",
+      "from": "next-36-program",
+      "to": "toronto",
+      "rel": "located_in"
+    },
+    {
+      "id": "what-to-optimize-for--asks_about--base-36",
+      "from": "what-to-optimize-for",
+      "to": "base-36",
+      "rel": "asks_about"
+    },
+    {
+      "id": "what-to-optimize-for--asks_about--start-a-startup",
+      "from": "what-to-optimize-for",
+      "to": "start-a-startup",
+      "rel": "asks_about"
+    },
+    {
+      "id": "what-is-base-36--asks_about--base-36",
+      "from": "what-is-base-36",
+      "to": "base-36",
+      "rel": "asks_about"
+    },
+    {
+      "id": "what-next-36-wants--asks_about--next-36-program",
+      "from": "what-next-36-wants",
+      "to": "next-36-program",
+      "rel": "asks_about"
+    },
+    {
+      "id": "after-toronto--asks_about--next-36-program",
+      "from": "after-toronto",
+      "to": "next-36-program",
+      "rel": "asks_about"
+    },
+    {
+      "id": "no-marine-tech--about--oceanaid",
+      "from": "no-marine-tech",
+      "to": "oceanaid",
+      "rel": "about"
+    },
+    {
+      "id": "own-pace--about--startup-studio",
+      "from": "own-pace",
+      "to": "startup-studio",
+      "rel": "about"
+    },
+    {
+      "id": "things-that-should-exist--informs--start-a-startup",
+      "from": "things-that-should-exist",
+      "to": "start-a-startup",
+      "rel": "informs"
+    },
+    {
+      "id": "energy-from-ambitious-rooms--informs--ambitious-room",
+      "from": "energy-from-ambitious-rooms",
+      "to": "ambitious-room",
+      "rel": "informs"
+    },
+    {
+      "id": "uvic-thinks-small--tension_with--ambitious-room",
+      "from": "uvic-thinks-small",
+      "to": "ambitious-room",
+      "rel": "tension_with"
+    },
+    {
+      "id": "hackathons-not-the-way--informs--how-to-get-ahead",
+      "from": "hackathons-not-the-way",
+      "to": "how-to-get-ahead",
+      "rel": "informs"
+    },
+    {
+      "id": "htn-teammate--said--hackathons-not-the-way",
+      "from": "htn-teammate",
+      "to": "hackathons-not-the-way",
+      "rel": "said"
+    },
+    {
+      "id": "htn-2026--about--find-cofounders",
+      "from": "htn-2026",
+      "to": "find-cofounders",
+      "rel": "about",
+      "note": "Went in looking for co-founders."
+    },
+    {
+      "id": "htn-2026--tension_with--startup-studio",
+      "from": "htn-2026",
+      "to": "startup-studio",
+      "rel": "tension_with",
+      "note": "Missed a class for HTN, landed on the compliance team."
+    },
+    {
+      "id": "htn-2026--supports--uvic-thinks-small",
+      "from": "htn-2026",
+      "to": "uvic-thinks-small",
+      "rel": "supports",
+      "note": "Made it eye-opening."
+    },
+    {
+      "id": "htn-shortlist--relates_to--htn-2026",
+      "from": "htn-shortlist",
+      "to": "htn-2026",
+      "rel": "relates_to"
+    },
+    {
+      "id": "nwhacks--relates_to--htn-2026",
+      "from": "nwhacks",
+      "to": "htn-2026",
+      "rel": "relates_to",
+      "note": "The comparison point."
+    },
+    {
+      "id": "lautaro--said--drop-sahaj",
+      "from": "lautaro",
+      "to": "drop-sahaj",
+      "rel": "said",
+      "note": "Said on the Sept 3 call that Sahaj was not helping."
+    },
+    {
+      "id": "lautaro--runs--vibe-summit-day",
+      "from": "lautaro",
+      "to": "vibe-summit-day",
+      "rel": "runs"
+    },
+    {
+      "id": "sahaj--relates_to--vibe",
+      "from": "sahaj",
+      "to": "vibe",
+      "rel": "relates_to",
+      "note": "In the group chat, did none of the work."
+    },
+    {
+      "id": "bias-to-action--tension_with--sahaj",
+      "from": "bias-to-action",
+      "to": "sahaj",
+      "rel": "tension_with"
+    },
+    {
+      "id": "perseverance--informs--how-to-frame-myself",
+      "from": "perseverance",
+      "to": "how-to-frame-myself",
+      "rel": "informs"
+    },
+    {
+      "id": "how-to-frame-myself--asks_about--find-cofounders",
+      "from": "how-to-frame-myself",
+      "to": "find-cofounders",
+      "rel": "asks_about"
+    },
+    {
+      "id": "cofounders-over-demos--informs--htn-shortlist",
+      "from": "cofounders-over-demos",
+      "to": "htn-shortlist",
+      "rel": "informs"
+    },
+    {
+      "id": "telco--supports--the-idea",
+      "from": "telco",
+      "to": "the-idea",
+      "rel": "supports",
+      "note": "One attempt. Doubts about retention."
+    },
+    {
+      "id": "reclaim--preceded--telco",
+      "from": "reclaim",
+      "to": "telco",
+      "rel": "preceded"
+    },
+    {
+      "id": "compliance-team--relates_to--the-idea",
+      "from": "compliance-team",
+      "to": "the-idea",
+      "rel": "relates_to"
+    },
+    {
+      "id": "dockside--about--marlin",
+      "from": "dockside",
+      "to": "marlin",
+      "rel": "about"
+    },
+    {
+      "id": "marlinbot--uses--skill-ai",
+      "from": "marlinbot",
+      "to": "skill-ai",
+      "rel": "uses"
+    },
+    {
+      "id": "marlin-edge--uses--skill-edge",
+      "from": "marlin-edge",
+      "to": "skill-edge",
+      "rel": "uses"
+    },
+    {
+      "id": "dockside--uses--skill-cloud",
+      "from": "dockside",
+      "to": "skill-cloud",
+      "rel": "uses"
+    },
+    {
+      "id": "chronos--uses--skill-web",
+      "from": "chronos",
+      "to": "skill-web",
+      "rel": "uses"
+    },
+    {
+      "id": "telco--uses--skill-web",
+      "from": "telco",
+      "to": "skill-web",
+      "rel": "uses"
+    },
+    {
+      "id": "signal-zero--uses--skill-cloud",
+      "from": "signal-zero",
+      "to": "skill-cloud",
+      "rel": "uses"
+    },
+    {
+      "id": "cloth-ee--uses--skill-web",
+      "from": "cloth-ee",
+      "to": "skill-web",
+      "rel": "uses"
+    },
+    {
+      "id": "vibe--uses--skill-design",
+      "from": "vibe",
+      "to": "skill-design",
+      "rel": "uses"
+    },
+    {
+      "id": "portfolio--uses--skill-design",
+      "from": "portfolio",
+      "to": "skill-design",
+      "rel": "uses"
+    },
+    {
+      "id": "synapse--uses--skill-ai",
+      "from": "synapse",
+      "to": "skill-ai",
+      "rel": "uses"
+    },
+    {
+      "id": "vibe--leads_to--victoria-network",
+      "from": "vibe",
+      "to": "victoria-network",
+      "rel": "leads_to",
+      "note": "How the connections came."
+    },
+    {
+      "id": "ares--uses--pc",
+      "from": "ares",
+      "to": "pc",
+      "rel": "uses"
+    },
+    {
+      "id": "startup-studio--supports--start-a-startup",
+      "from": "startup-studio",
+      "to": "start-a-startup",
+      "rel": "supports",
+      "note": "Founders, mentors and investors in the room every week."
+    }
+  ]
+}
