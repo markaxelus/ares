@@ -11,6 +11,10 @@ command line and the tiny local server behind index.html. Standard library only.
     py -3.13 brain/brain.py add --type belief --title "..." --summary "..."
     py -3.13 brain/brain.py link htn-2026 supports things-that-should-exist
     py -3.13 brain/brain.py import ~/Downloads/brain-extract.json   # merge facts from another chat
+    py -3.13 brain/brain.py context "next 36"      # compact pack for an agent
+    py -3.13 brain/brain.py log "Peggy offered an intro to X"   # quick note into the Inbox
+    py -3.13 brain/brain.py ingest meeting.txt     # extract facts from a transcript and merge them
+    py -3.13 brain/brain.py mcp                    # MCP server for Claude Code / agents
     py -3.13 brain/brain.py --help
 
 Query syntax (shared with the UI):
@@ -34,8 +38,12 @@ import json
 import os
 import re
 import shlex
+import shutil
+import subprocess
 import sys
 import threading
+import time
+import urllib.request
 import webbrowser
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -47,6 +55,9 @@ DATA = HERE / "brain.json"
 HISTORY = HERE / "history"
 INDEX = HERE / "index.html"
 MAX_SNAPSHOTS = 30
+INBOX = HERE / "inbox"
+DONE = INBOX / "done"
+INBOX_ID = "inbox"
 CONFIDENCE = ("high", "medium", "low")
 QUERY_KEYS = {"type", "t", "tag", "conf", "is", "since", "rel", "link", "id", "in"}
 _lock = threading.Lock()
@@ -725,19 +736,36 @@ def cmd_restore(a):
     print(f"restored {path.name}")
 
 
-def cmd_import(a):
-    """Merge nodes and edges from another JSON file. Ids that already exist are skipped unless --update."""
-    doc = load()
-    inc = json.loads(Path(a.file).read_text(encoding="utf-8"))
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def clean_conf(v) -> str:
+    if isinstance(v, str) and v.lower() in CONFIDENCE:
+        return v.lower()
+    if isinstance(v, (int, float)):
+        return "high" if v >= 0.85 else "medium" if v >= 0.5 else "low"
+    return "medium"
+
+
+def merge_doc(doc: dict, inc: dict, update: bool = False, source: str | None = None, append: bool = False) -> dict:
+    """Merge a proposal ({nodes, edges}) into doc in place. Returns counts.
+
+    append=True is the safe mode for machine extractions: existing nodes never lose or change
+    a field; new information is appended to their body as dated lines, new tags are added,
+    the root identity node is protected, and links touching the root are dropped."""
     if isinstance(inc, dict) and "doc" in inc:
         inc = inc["doc"]
     if not isinstance(inc, dict) or not isinstance(inc.get("nodes"), list):
-        raise SystemExit("expected a JSON object with a 'nodes' list (and optionally 'edges', 'types', 'rels')")
+        raise ValueError("expected a JSON object with a 'nodes' list (and optionally 'edges', 'types', 'rels')")
+    a = argparse.Namespace(update=update and not append, source=source)
+    roots = [n["id"] for n in doc["nodes"] if not n.get("parent")]
+    root_id = roots[0] if len(roots) == 1 else None
     for k, v in (inc.get("types") or {}).items():
         doc["types"].setdefault(k, v if isinstance(v, dict) else {"label": str(v), "color": "#8a8fa8"})
     for k, v in (inc.get("rels") or {}).items():
         doc["rels"].setdefault(k, str(v))
     idx = node_index(doc)
+    existing_ids = set(idx)
     alias: dict[str, str] = {}
     added = updated = skipped = 0
     for n in inc["nodes"]:
@@ -751,6 +779,27 @@ def cmd_import(a):
         existing = idx.get(nid) or next((x for x in doc["nodes"] if x["title"].lower() == n["title"].strip().lower()), None)
         if existing:
             alias[str(n.get("id") or "")] = existing["id"]; alias[n["title"]] = existing["id"]
+            if append:
+                if existing["id"] == root_id:
+                    skipped += 1; continue
+                have = (existing.get("summary", "") + "\n" + existing.get("body", "")).lower()
+                new_bits = []
+                for field in ("summary", "body"):
+                    txt = str(n.get(field) or "").strip()
+                    for line in txt.split("\n"):
+                        line = line.strip().lstrip("-• ").strip()
+                        if len(line) > 12 and line.lower() not in have and line.lower()[:60] not in have:
+                            new_bits.append(line)
+                for t in n.get("tags") or []:
+                    if isinstance(t, str) and t not in existing.setdefault("tags", []):
+                        existing["tags"].append(t)
+                if new_bits:
+                    stamp = f" ({source})" if source else ""
+                    existing["body"] = (existing.get("body", "").rstrip() + "\n" + "\n".join(f"- {b}{stamp}" for b in new_bits)).strip()
+                    existing["updated"] = today(); updated += 1
+                else:
+                    skipped += 1
+                continue
             if a.update:
                 for f in ("type", "title", "summary", "body", "tags", "confidence", "source"):
                     if f in n and n[f] not in (None, ""):
@@ -762,12 +811,13 @@ def cmd_import(a):
             continue
         nid = unique_id(doc, nid)
         alias[str(n.get("id") or "")] = nid; alias[n["title"]] = nid
+        created = str(n.get("created") or "")
         node = {
             "id": nid, "type": ntype, "title": n["title"].strip(), "summary": str(n.get("summary") or "").strip(),
-            "body": str(n.get("body") or "").strip(), "tags": [str(t) for t in (n.get("tags") or [])],
-            "confidence": n.get("confidence") if n.get("confidence") in CONFIDENCE else "medium",
+            "body": str(n.get("body") or "").strip(), "tags": [str(t) for t in (n.get("tags") or []) if isinstance(t, str)],
+            "confidence": clean_conf(n.get("confidence")),
             "source": str(n.get("source") or a.source or f"import {today()}"),
-            "created": str(n.get("created") or today()), "updated": today(),
+            "created": created if DATE_RE.match(created) else today(), "updated": today(),
         }
         if n.get("pinned"): node["pinned"] = True
         if isinstance(n.get("order"), (int, float)): node["order"] = n["order"]
@@ -783,18 +833,557 @@ def cmd_import(a):
         ref = x.pop("_parent_ref", None)
         if ref:
             target = endpoint(ref)
-            if target and target != x["id"]:
+            if target and target != x["id"] and target not in ancestors_of(doc, x["id"]) and x["id"] not in ancestors_of(doc, target):
                 x["parent"] = target
+        if append and x["id"] not in existing_ids and (not x.get("parent") or x.get("parent") == root_id):
+            x["parent"] = ensure_inbox(doc)["id"]
     links = 0
     for e in inc.get("edges") or []:
         if not isinstance(e, dict): continue
         src, dst = endpoint(e.get("from")), endpoint(e.get("to"))
         if not src or not dst or src == dst: continue
+        if append and (src == root_id or dst == root_id or str(e.get("rel") or "") not in doc["rels"]): continue
         before = len(doc["edges"])
         add_edge(doc, src, str(e.get("rel") or "relates_to"), dst, str(e.get("note") or ""))
         links += len(doc["edges"]) - before
+    return {"added": added, "updated": updated, "skipped": skipped, "links": links}
+
+
+def cmd_import(a):
+    """Merge nodes and edges from another JSON file. Ids that already exist are skipped unless --update."""
+    doc = load()
+    inc = json.loads(Path(a.file).read_text(encoding="utf-8"))
+    try:
+        r = merge_doc(doc, inc, update=a.update, source=a.source)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
     save(doc)
-    print(f"added {added} node(s), updated {updated}, skipped {skipped}, added {links} link(s)")
+    print(f"added {r['added']} node(s), updated {r['updated']}, skipped {r['skipped']}, added {r['links']} link(s)")
+
+
+# ----------------------------------------------------------------- agents: context pack
+
+def node_path(doc: dict, nid: str) -> str:
+    idx = node_index(doc)
+    return " › ".join(idx[a]["title"] for a in reversed(ancestors_of(doc, nid)))
+
+
+def node_md(doc: dict, n: dict, links: bool = True, body: bool = True) -> str:
+    idx = node_index(doc)
+    path = node_path(doc, n["id"])
+    out = [f"### {n['title']}  `{n['id']}`" + (f"  ({path})" if path else "")]
+    if n.get("summary"):
+        out.append(n["summary"])
+    if body and n.get("body"):
+        out.append(n["body"])
+    kids = children_of(doc, n["id"])
+    if kids:
+        out.append("contains: " + "; ".join(f"{k['title']} `{k['id']}`" for k in kids))
+    if links:
+        ls = []
+        for e in edges_of(doc, n["id"]):
+            if e["from"] == n["id"]:
+                ls.append(f"→ {rel_label(doc, e['rel'])} {idx.get(e['to'], {}).get('title', e['to'])} `{e['to']}`" + (f" ({e['note']})" if e.get("note") else ""))
+            else:
+                ls.append(f"← {idx.get(e['from'], {}).get('title', e['from'])} `{e['from']}` {rel_label(doc, e['rel'])}" + (f" ({e['note']})" if e.get("note") else ""))
+        if ls:
+            out.append("links: " + "; ".join(ls))
+    bits = []
+    if n.get("confidence") and n["confidence"] != "high":
+        bits.append(f"confidence {n['confidence']}")
+    if n.get("updated"):
+        bits.append(f"updated {n['updated']}")
+    if bits:
+        out.append("_" + " · ".join(bits) + "_")
+    return "\n".join(out)
+
+
+def context_pack(doc: dict, topic: str | None = None, budget: int = 2500) -> str:
+    """Compact markdown for an agent: who I am, the map one level deep, pinned nodes, and matches for a topic."""
+    limit = budget * 4
+    roots = children_of(doc, None)
+    root = roots[0] if len(roots) == 1 else None
+    out = [f"# {doc['meta'].get('name', 'Second brain')} · {doc['meta'].get('owner', '')} · updated {doc['meta'].get('updated', '?')}"]
+    if root:
+        out.append(root["summary"])
+        if root.get("body"):
+            out.append(root["body"])
+    out.append("\n## Map")
+    for g in children_of(doc, root["id"] if root else None):
+        out.append(f"- **{g['title']}** `{g['id']}`: {g['summary'][:160]}")
+        for k in children_of(doc, g["id"]):
+            mark = f" (+{len(children_of(doc, k['id']))})" if children_of(doc, k["id"]) else ""
+            out.append(f"  - {k['title']} `{k['id']}`{mark}: {k['summary'][:120]}")
+    pinned = [n for n in doc["nodes"] if n.get("pinned") and n is not root]
+    if pinned:
+        out.append("\n## Pinned")
+        for n in pinned:
+            out.append(f"- {n['title']} `{n['id']}`: {n['summary'][:200]}")
+    if topic:
+        hits = find(doc, topic)
+        words = [t[1].lower() for t in parse_query(topic) if t[0] == "text" and not t[2]]
+        if words:
+            hits.sort(key=lambda n: min((0 if n["title"].lower().startswith(w) else 1 if w in n["title"].lower() else 2 if w in " ".join(n.get("tags", [])).lower() else 3) for w in words))
+        out.append(f"\n## On: {topic}")
+        if not hits:
+            out.append("(nothing matches; try broader words or a group id with in:)")
+        for n in hits[:12]:
+            block = node_md(doc, n)
+            if sum(len(x) for x in out) + len(block) > limit:
+                out.append(f"(+{len(hits) - hits.index(n)} more; narrow the topic)")
+                break
+            out.append(block)
+    text = "\n".join(out)
+    return text[:limit] + ("\n…(truncated; raise budget)" if len(text) > limit else "")
+
+
+def cmd_context(a):
+    print(context_pack(load(), " ".join(a.topic) if a.topic else None, a.budget))
+
+
+# ----------------------------------------------------------------- inbox: notes, ingest, sort, watch
+
+def ensure_inbox(doc: dict) -> dict:
+    idx = node_index(doc)
+    if INBOX_ID in idx:
+        return idx[INBOX_ID]
+    roots = children_of(doc, None)
+    doc["types"].setdefault("note", {"label": "Notes", "color": "#9a9ea6"})
+    node = {"id": INBOX_ID, "type": "note", "title": "Inbox", "summary": "Quick notes and unsorted captures. Sorted into groups by `brain.py sort`.",
+            "body": "", "tags": ["inbox"], "confidence": "high", "source": "system", "created": today(), "updated": today(), "order": 99}
+    if len(roots) == 1:
+        node["parent"] = roots[0]["id"]
+    doc["nodes"].append(node)
+    return node
+
+
+def add_note(doc: dict, text: str, source: str = "") -> dict:
+    inbox = ensure_inbox(doc)
+    doc["types"].setdefault("note", {"label": "Notes", "color": "#9a9ea6"})
+    text = text.strip()
+    title = text.split("\n", 1)[0][:80].rstrip(" .")
+    node = {"id": unique_id(doc, slugify(title) or "note"), "type": "note", "title": title, "summary": text, "body": "",
+            "tags": ["inbox"], "confidence": "high", "source": source or f"note {today()}", "created": today(), "updated": today(),
+            "parent": inbox["id"]}
+    doc["nodes"].append(node)
+    return node
+
+
+def cmd_log(a):
+    doc = load()
+    text = " ".join(a.text).strip() or sys.stdin.read().strip()
+    if not text:
+        raise SystemExit("nothing to log")
+    n = add_note(doc, text)
+    save(doc)
+    print(n["id"])
+
+
+def read_text_any(path: Path) -> str:
+    """Plain text from txt/md/vtt/srt, or the user side of a Claude Code .jsonl transcript."""
+    suf = path.suffix.lower()
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    if suf == ".jsonl":
+        lines = []
+        for line in raw.splitlines():
+            try:
+                j = json.loads(line)
+            except ValueError:
+                continue
+            if j.get("type") != "user":
+                continue
+            c = (j.get("message") or {}).get("content")
+            texts = [c] if isinstance(c, str) else [b.get("text", "") for b in (c or []) if isinstance(b, dict) and b.get("type") == "text"]
+            t = "\n".join(x for x in texts if x).strip()
+            if t and not t.startswith("<"):
+                lines.append(f"[{str(j.get('timestamp', ''))[:10]}] {t}")
+        return "\n".join(lines)
+    if suf in (".vtt", ".srt"):
+        keep = []
+        for line in raw.splitlines():
+            if re.match(r"^\s*\d+\s*$", line) or "-->" in line or line.strip().upper() == "WEBVTT":
+                continue
+            keep.append(line)
+        return "\n".join(keep)
+    if suf == ".json":
+        try:
+            return json.dumps(json.loads(raw), ensure_ascii=False, indent=1)
+        except ValueError:
+            return raw
+    return raw
+
+
+def chunk_text(text: str, max_chars: int = 36000) -> list[str]:
+    if len(text) <= max_chars:
+        return [text]
+    chunks, cur = [], []
+    size = 0
+    for para in text.split("\n"):
+        if size + len(para) > max_chars and cur:
+            chunks.append("\n".join(cur)); cur, size = [], 0
+        cur.append(para); size += len(para) + 1
+    if cur:
+        chunks.append("\n".join(cur))
+    return chunks
+
+
+EXTRACT_RULES = """You extract facts about ME (the owner of this knowledge graph) from a text and return JSON for import.
+
+INCLUDE: facts about me and my life: who I am, what I want, believe, decided, wonder about; things that happened; people I work with or know; places and organizations I am part of; skills; tools; projects. Only what the text supports.
+LEAVE OUT: anything about an AI assistant or how it should behave, formatting or tone preferences, tooling trivia, generic advice, anything not about me. Nothing trivial.
+VOICE: write summaries and bodies as my own terse notes, first person where a pronoun is needed. Never "the user" or "you". Never "not X but Y". No em dashes. Confidence goes in the field, never in the prose.
+PLACEMENT: every node gets a "parent": an existing group id from the outline below, or the id of another node in your output. Nest parts inside the thing they are part of. Reuse existing node ids instead of creating near-duplicates; to add to an existing node, output it with the same id and put ONLY the new information in body (existing text is never overwritten; new lines get appended). Cross-links go in "edges" using the relations listed. Containment is never an edge.
+SHAPE: return only one JSON object: {"nodes":[{"id","type","title","summary","body","tags","confidence","source","created","parent","order"}],"edges":[{"from","rel","to","note"}]}
+TYPES: identity, goal, project, belief, decision, question, event, person, environment, skill, tool.
+RELATIONS: leads_to, supports, informs, tension_with, constrains, about, asks_about, said, runs, uses, preceded, relates_to, works_with, located_in, met_at, made_at, teaches.
+Dates YYYY-MM-DD. Prefer fewer, denser nodes. If the text holds nothing about me, return {"nodes":[],"edges":[]}."""
+
+
+def outline_text(doc: dict, depth: int = 2) -> str:
+    lines = []
+
+    def walk(parent, d):
+        if d > depth:
+            return
+        for n in children_of(doc, parent):
+            lines.append(f"{'  ' * d}{n['title']} [{n['id']}]" + (f" ({n['type']})" if d else ""))
+            walk(n["id"], d + 1)
+    walk(None, 0)
+    return "\n".join(lines)
+
+
+def build_extract_prompt(doc: dict, text: str, source: str) -> str:
+    ids = ", ".join(n["id"] for n in doc["nodes"])
+    return (EXTRACT_RULES + "\n\nEXISTING OUTLINE (group ids in brackets):\n" + outline_text(doc)
+            + "\n\nEXISTING NODE IDS: " + ids
+            + f"\n\nSOURCE LABEL for the source field: {source}"
+            + "\n\nTEXT:\n\"\"\"\n" + text + "\n\"\"\"\n\nReturn the JSON object now.")
+
+
+def claude_exe() -> str | None:
+    for cand in (shutil.which("claude"), os.path.expanduser("~/.local/bin/claude.exe"), os.path.expanduser("~/.local/bin/claude")):
+        if cand and Path(cand).exists():
+            return cand
+    return None
+
+
+def run_claude(prompt: str, model: str | None) -> str:
+    exe = claude_exe()
+    if not exe:
+        raise RuntimeError("claude CLI not found; install Claude Code or use --local")
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
+    cmd = [exe, "-p", "--output-format", "json"]
+    if model:
+        cmd += ["--model", model]
+    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", env=env, timeout=600)
+    out = r.stdout.strip()
+    try:
+        j = json.loads(out)
+    except ValueError:
+        raise RuntimeError(f"claude returned no JSON: {(out or r.stderr)[:300]}")
+    if j.get("is_error"):
+        raise RuntimeError(f"claude error: {j.get('result', '')[:300]}  (run `claude login` once if the session expired)")
+    return j.get("result", "")
+
+
+def run_ollama(prompt: str, model: str) -> str:
+    body = json.dumps({"model": model, "prompt": prompt, "stream": False, "format": "json", "options": {"temperature": 0.1, "num_ctx": 32768}}).encode("utf-8")
+    req = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=body, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=900) as resp:
+            return json.loads(resp.read().decode("utf-8")).get("response", "")
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"ollama failed ({exc}); is it running and is '{model}' pulled?")
+
+
+def parse_proposal(text: str) -> dict:
+    text = text.strip()
+    m = re.search(r"\{.*\}", text, re.S)
+    if not m:
+        raise RuntimeError("no JSON object in the model output")
+    prop = json.loads(m.group(0))
+    prop.setdefault("nodes", []); prop.setdefault("edges", [])
+    return prop
+
+
+def extract(doc: dict, text: str, source: str, engine: str = "claude", model: str | None = None) -> dict:
+    prompt = build_extract_prompt(doc, text, source)
+    raw = run_ollama(prompt, model or "qwen3.5:9b") if engine == "ollama" else run_claude(prompt, model)
+    return parse_proposal(raw)
+
+
+def ingest_path(doc: dict, path: Path, engine: str, model: str | None, dry: bool = False, log=print) -> dict:
+    text = read_text_any(path).strip()
+    if not text:
+        log(f"skip {path.name}: empty"); return {"added": 0, "updated": 0, "skipped": 0, "links": 0}
+    source = f"{path.name} ({today()})"
+    total = {"added": 0, "updated": 0, "skipped": 0, "links": 0}
+    chunks = chunk_text(text)
+    for i, chunk in enumerate(chunks, 1):
+        log(f"{path.name}: extracting part {i}/{len(chunks)} with {engine}{' ' + model if model else ''}…")
+        prop = extract(doc, chunk, source, engine, model)
+        if dry:
+            log(json.dumps(prop, ensure_ascii=False, indent=2)); continue
+        r = merge_doc(doc, prop, source=source, append=True)
+        for k in total:
+            total[k] += r[k]
+        log(f"  part {i}: +{r['added']} nodes, {r['updated']} updated, +{r['links']} links")
+    return total
+
+
+def cmd_ingest(a):
+    paths = []
+    for raw in a.paths:
+        pth = Path(raw)
+        if pth.is_dir():
+            paths += sorted(x for x in pth.iterdir() if x.is_file() and not x.name.startswith("."))
+        elif pth.exists():
+            paths.append(pth)
+        else:
+            raise SystemExit(f"no such file: {raw}")
+    if not paths:
+        raise SystemExit("nothing to ingest")
+    doc = load()
+    engine = "ollama" if a.local else "claude"
+    model = a.model or (a.local if isinstance(a.local, str) and a.local != "yes" else None)
+    grand = {"added": 0, "updated": 0, "skipped": 0, "links": 0}
+    for pth in paths:
+        try:
+            r = ingest_path(doc, pth, engine, model, dry=a.dry_run)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc))
+        for k in grand:
+            grand[k] += r[k]
+        if a.move and not a.dry_run:
+            DONE.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(pth), str(DONE / pth.name))
+    if not a.dry_run:
+        save(doc)
+        print(f"done: +{grand['added']} nodes, {grand['updated']} updated, +{grand['links']} links")
+
+
+def cmd_sort(a):
+    """Turn Inbox notes into proper nodes in the right groups."""
+    doc = load()
+    notes = [n for n in doc["nodes"] if n.get("parent") == INBOX_ID and n["id"] != INBOX_ID]
+    if not notes:
+        print("inbox is empty"); return
+    text = "Quick notes I wrote, newest last:\n" + "\n".join(f"- [{n.get('created', '')}] {n['summary']}" for n in notes)
+    engine = "ollama" if a.local else "claude"
+    model = a.model or (a.local if isinstance(a.local, str) and a.local != "yes" else None)
+    try:
+        prop = extract(doc, text, f"inbox notes ({today()})", engine, model)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc))
+    if a.dry_run:
+        print(json.dumps(prop, ensure_ascii=False, indent=2)); return
+    r = merge_doc(doc, prop, append=True)
+    if r["added"] or r["updated"]:
+        keep = {n["id"] for n in notes} if a.keep else set()
+        doc["nodes"] = [n for n in doc["nodes"] if n["id"] not in {x["id"] for x in notes} or n["id"] in keep]
+    save(doc)
+    print(f"sorted {len(notes)} note(s): +{r['added']} nodes, {r['updated']} updated, +{r['links']} links")
+
+
+def watch_inbox(interval: float, engine: str, model: str | None, log=print, stop=None) -> None:
+    INBOX.mkdir(exist_ok=True); DONE.mkdir(exist_ok=True)
+    seen: dict[str, float] = {}
+    while stop is None or not stop.is_set():
+        for pth in sorted(x for x in INBOX.iterdir() if x.is_file() and not x.name.startswith(".")):
+            try:
+                mtime = pth.stat().st_mtime
+            except OSError:
+                continue
+            if time.time() - mtime < 3:      # still being written
+                continue
+            if seen.get(pth.name) == mtime:
+                continue
+            seen[pth.name] = mtime
+            try:
+                doc = load()
+                r = ingest_path(doc, pth, engine, model, log=log)
+                save(doc)
+                shutil.move(str(pth), str(DONE / pth.name))
+                log(f"ingested {pth.name}: +{r['added']} nodes, {r['updated']} updated, +{r['links']} links")
+            except Exception as exc:  # noqa: BLE001
+                log(f"ingest failed for {pth.name}: {exc}")
+        if stop is None:
+            time.sleep(interval)
+        elif stop.wait(interval):
+            break
+
+
+def cmd_watch(a):
+    engine = "ollama" if a.local else "claude"
+    model = a.model or (a.local if isinstance(a.local, str) and a.local != "yes" else None)
+    print(f"watching {INBOX} every {a.interval:.0f}s with {engine} (Ctrl+C to stop)")
+    try:
+        watch_inbox(a.interval, engine, model)
+    except KeyboardInterrupt:
+        print("\nstopped")
+
+
+# ----------------------------------------------------------------- agents: MCP server (stdio)
+
+MCP_TOOLS = [
+    {"name": "brain_context", "description": "Compact overview of Mark for an agent: who he is, the map of groups, pinned nodes, and the nodes matching a topic with their paths and cross-links. Call this first.",
+     "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "description": "Optional. Free words or query syntax (type:goal, in:oceanaid, #tag)."}, "budget": {"type": "integer", "description": "Approximate token budget, default 2500."}}}},
+    {"name": "brain_search", "description": "Search nodes. Query syntax: free words, type:goal, #tag, in:<group-id>, is:pinned|group|recent, since:YYYY-MM-DD, link:<id>, -negate.",
+     "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "description": "Default 20."}}, "required": ["query"]}},
+    {"name": "brain_get", "description": "Full node by id or title: summary, details, path, what it contains, cross-links.",
+     "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
+    {"name": "brain_tree", "description": "The outline (hierarchy) from a node down, or the whole tree.",
+     "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "depth": {"type": "integer", "description": "Default 2."}}}},
+    {"name": "brain_add", "description": "Add a node about Mark. Write summary/body as his own terse notes. Always give a parent group id. Optional links: [{rel, to, incoming?}].",
+     "inputSchema": {"type": "object", "properties": {"type": {"type": "string"}, "title": {"type": "string"}, "summary": {"type": "string"}, "body": {"type": "string"}, "parent": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}, "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "source": {"type": "string"}, "links": {"type": "array", "items": {"type": "object", "properties": {"rel": {"type": "string"}, "to": {"type": "string"}, "incoming": {"type": "boolean"}}, "required": ["rel", "to"]}}}, "required": ["type", "title", "summary"]}},
+    {"name": "brain_update", "description": "Change fields on an existing node (title, summary, body, tags, confidence, source, parent, order, type, pinned).",
+     "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "fields": {"type": "object"}}, "required": ["id", "fields"]}},
+    {"name": "brain_link", "description": "Connect two nodes: from --rel--> to. Relations: leads_to, supports, informs, tension_with, constrains, about, asks_about, said, runs, uses, preceded, relates_to, works_with, located_in, met_at, made_at, teaches.",
+     "inputSchema": {"type": "object", "properties": {"from": {"type": "string"}, "rel": {"type": "string"}, "to": {"type": "string"}, "note": {"type": "string"}}, "required": ["from", "rel", "to"]}},
+    {"name": "brain_note", "description": "Drop a quick note into the Inbox to be sorted later.",
+     "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
+    {"name": "brain_ingest", "description": "Extract facts about Mark from a text file or transcript on disk and merge them into the brain (slow; uses the configured model).",
+     "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}, "local": {"type": "boolean", "description": "Use the local Ollama model instead of claude."}}, "required": ["path"]}},
+]
+
+
+def mcp_call(name: str, args: dict) -> str:
+    doc = load()
+    if name == "brain_context":
+        return context_pack(doc, args.get("topic") or None, int(args.get("budget") or 2500))
+    if name == "brain_search":
+        hits = find(doc, args["query"])[: int(args.get("limit") or 20)]
+        if not hits:
+            return "no matches"
+        return "\n".join(f"- {n['title']} `{n['id']}` ({n['type']}; {node_path(doc, n['id'])}): {n['summary'][:160]}" for n in hits)
+    if name == "brain_get":
+        try:
+            n = resolve(doc, args["id"])
+        except SystemExit as exc:
+            return str(exc)
+        return node_md(doc, n)
+    if name == "brain_tree":
+        start = resolve(doc, args["id"])["id"] if args.get("id") else None
+        depth = int(args.get("depth") or 2)
+        lines = []
+
+        def walk(parent, d):
+            if d > depth:
+                return
+            for n in children_of(doc, parent):
+                lines.append(f"{'  ' * d}- {n['title']} `{n['id']}`: {n['summary'][:110]}")
+                walk(n["id"], d + 1)
+        if start:
+            n0 = node_index(doc)[start]; lines.append(f"{n0['title']} `{start}`: {n0['summary'][:140]}")
+        walk(start, 1 if start else 0)
+        return "\n".join(lines) or "(empty)"
+    if name == "brain_add":
+        if args["type"] not in doc["types"]:
+            return f"unknown type; use one of {', '.join(doc['types'])}"
+        nid = unique_id(doc, slugify(args["title"]))
+        node = {"id": nid, "type": args["type"], "title": args["title"].strip(), "summary": str(args.get("summary") or "").strip(),
+                "body": str(args.get("body") or "").strip(), "tags": [str(t) for t in (args.get("tags") or [])],
+                "confidence": args.get("confidence") if args.get("confidence") in CONFIDENCE else "medium",
+                "source": str(args.get("source") or f"agent {today()}"), "created": today(), "updated": today()}
+        if args.get("parent"):
+            try:
+                node["parent"] = resolve(doc, args["parent"])["id"]
+            except SystemExit as exc:
+                return str(exc)
+        doc["nodes"].append(node)
+        for l in args.get("links") or []:
+            try:
+                other = resolve(doc, l["to"])["id"]
+            except SystemExit as exc:
+                return str(exc)
+            src, dst = (other, nid) if l.get("incoming") else (nid, other)
+            add_edge(doc, src, l["rel"], dst, str(l.get("note") or ""))
+        save(doc)
+        return f"added {nid}" + (f" inside {node['parent']}" if node.get("parent") else " at top level (give it a parent)")
+    if name == "brain_update":
+        try:
+            n = resolve(doc, args["id"])
+        except SystemExit as exc:
+            return str(exc)
+        fields = args.get("fields") or {}
+        for k, v in fields.items():
+            if k == "parent":
+                if v in (None, "", "root"):
+                    n.pop("parent", None)
+                else:
+                    pid = resolve(doc, v)["id"]
+                    if pid == n["id"] or pid in descendants_of(doc, n["id"]):
+                        return "that parent would create a cycle"
+                    n["parent"] = pid
+            elif k == "pinned":
+                if v:
+                    n["pinned"] = True
+                else:
+                    n.pop("pinned", None)
+            elif k in ("title", "summary", "body", "source", "type", "confidence", "order", "tags"):
+                n[k] = v
+        n["updated"] = today()
+        save(doc)
+        return f"updated {n['id']}"
+    if name == "brain_link":
+        try:
+            src = resolve(doc, args["from"])["id"]; dst = resolve(doc, args["to"])["id"]
+        except SystemExit as exc:
+            return str(exc)
+        e = add_edge(doc, src, args["rel"], dst, str(args.get("note") or ""))
+        save(doc)
+        return f"linked {e['id']}"
+    if name == "brain_note":
+        n = add_note(doc, args["text"], source=f"agent note {today()}")
+        save(doc)
+        return f"noted as {n['id']} in Inbox"
+    if name == "brain_ingest":
+        pth = Path(args["path"])
+        if not pth.exists():
+            return f"no such file: {pth}"
+        engine = "ollama" if args.get("local") else "claude"
+        msgs = []
+        r = ingest_path(doc, pth, engine, None, log=msgs.append)
+        save(doc)
+        return "\n".join(msgs) + f"\ndone: +{r['added']} nodes, {r['updated']} updated, +{r['links']} links"
+    raise KeyError(name)
+
+
+def cmd_mcp(a):
+    """Model Context Protocol server over stdio, for Claude Code / Ares / any MCP client."""
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8", newline="\n")
+
+    def send(obj):
+        sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n"); sys.stdout.flush()
+
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        mid, method, params = msg.get("id"), msg.get("method"), msg.get("params") or {}
+        if method == "initialize":
+            send({"jsonrpc": "2.0", "id": mid, "result": {"protocolVersion": params.get("protocolVersion") or "2025-06-18",
+                  "capabilities": {"tools": {}}, "serverInfo": {"name": "brain", "version": "1"}}})
+        elif method == "tools/list":
+            send({"jsonrpc": "2.0", "id": mid, "result": {"tools": MCP_TOOLS}})
+        elif method == "tools/call":
+            name = params.get("name"); args = params.get("arguments") or {}
+            try:
+                text = mcp_call(name, args); err = False
+            except KeyError:
+                text, err = f"unknown tool {name}", True
+            except Exception as exc:  # noqa: BLE001
+                text, err = f"error: {exc}", True
+            send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": text}], "isError": err}})
+        elif method == "ping":
+            send({"jsonrpc": "2.0", "id": mid, "result": {}})
+        elif mid is not None:
+            send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"unknown method {method}"}})
 
 
 # ----------------------------------------------------------------- server
@@ -863,6 +1452,13 @@ def cmd_serve(a):
     server = ThreadingHTTPServer((a.host, a.port), Handler)
     url = f"http://{a.host}:{a.port}/"
     print(f"Second brain · {url}   (Ctrl+C to stop)")
+    stop = threading.Event()
+    if not a.no_watch:
+        engine = "ollama" if a.local else "claude"
+        model = a.model or (a.local if isinstance(a.local, str) and a.local != "yes" else None)
+        INBOX.mkdir(exist_ok=True)
+        print(f"watching {INBOX} for transcripts and notes ({engine})")
+        threading.Thread(target=watch_inbox, args=(20.0, engine, model, print, stop), daemon=True).start()
     if not a.no_open:
         threading.Timer(0.4, webbrowser.open, args=(url,)).start()
     try:
@@ -870,6 +1466,7 @@ def cmd_serve(a):
     except KeyboardInterrupt:
         print("\nstopped")
     finally:
+        stop.set()
         server.server_close()
 
 
@@ -883,6 +1480,31 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--no-open", action="store_true", help="don't open the browser")
+    s.add_argument("--no-watch", action="store_true", help="don't auto-ingest files dropped in brain/inbox")
+    s.add_argument("--local", nargs="?", const="yes", metavar="MODEL", help="extract with local Ollama (default qwen3.5:9b) instead of claude")
+    s.add_argument("--model", help="model name for the extractor")
+
+    s = sub.add_parser("context", help="compact context pack for an agent, optionally about a topic"); s.set_defaults(fn=cmd_context)
+    s.add_argument("topic", nargs="*"); s.add_argument("--budget", type=int, default=2500, help="approximate tokens")
+
+    s = sub.add_parser("log", help="drop a quick note into the Inbox"); s.set_defaults(fn=cmd_log)
+    s.add_argument("text", nargs="*")
+
+    s = sub.add_parser("ingest", help="extract facts from transcripts/notes and merge them"); s.set_defaults(fn=cmd_ingest)
+    s.add_argument("paths", nargs="+", help="files or folders (.txt .md .vtt .srt .json .jsonl)")
+    s.add_argument("--local", nargs="?", const="yes", metavar="MODEL", help="use local Ollama instead of claude")
+    s.add_argument("--model"); s.add_argument("--dry-run", action="store_true", help="print the proposal, change nothing")
+    s.add_argument("--move", action="store_true", help="move processed files to inbox/done")
+
+    s = sub.add_parser("sort", help="file Inbox notes into the right groups"); s.set_defaults(fn=cmd_sort)
+    s.add_argument("--local", nargs="?", const="yes", metavar="MODEL"); s.add_argument("--model")
+    s.add_argument("--dry-run", action="store_true"); s.add_argument("--keep", action="store_true", help="keep the raw notes too")
+
+    s = sub.add_parser("watch", help="auto-ingest anything dropped into brain/inbox"); s.set_defaults(fn=cmd_watch)
+    s.add_argument("--interval", type=float, default=20)
+    s.add_argument("--local", nargs="?", const="yes", metavar="MODEL"); s.add_argument("--model")
+
+    sub.add_parser("mcp", help="run as an MCP server over stdio (for Claude Code and agents)").set_defaults(fn=cmd_mcp)
 
     s = sub.add_parser("find", help="search nodes (see query syntax)"); s.set_defaults(fn=cmd_find)
     s.add_argument("query", nargs="*")
