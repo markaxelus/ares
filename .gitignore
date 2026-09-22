@@ -1,0 +1,8 @@
+# second brain snapshots (local undo history)
+brain/history/
+brain/*.json.tmp
+
+# python
+__pycache__/
+*.pyc
+.venv/
