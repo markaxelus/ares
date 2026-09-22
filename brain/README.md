@@ -31,6 +31,7 @@ That opens http://127.0.0.1:8765. Every change in the UI saves straight back to
 | `index.html` | The UI. Served by `brain.py serve`; opening the file directly shows a "not connected" screen. |
 | `history/` | Automatic snapshots before each save. `brain.py history`, `brain.py restore <name>` |
 | `EXTRACT_PROMPT.md` | Prompt to paste into other Claude chats (web, phone, other machines) to pull my context out as JSON, then `brain.py import` it. |
+| `inbox/` | Drop transcripts, meeting notes or any text here; the running server extracts facts and merges them (see below). Processed files move to `inbox/done/`. |
 
 ## In the UI
 
@@ -115,6 +116,32 @@ py -3.13 brain/brain.py import extract.json --update             # same, but ove
 ```
 
 Types: identity, goal, project, belief, decision, question, event, person, environment (places, schools, companies, programs), skill, tool. Add a type by adding a key to `types`; add a relation by using it (the CLI and UI register unknown relations automatically).
+
+## For agents
+
+The brain is an MCP server, so any Claude Code session or agent can read and write it without pasting anything. It is registered at user scope on this machine (`claude mcp list` shows `brain`). On another machine:
+
+```bash
+claude mcp add --scope user brain -- py -3.13 C:/path/to/ares/brain/brain.py mcp
+```
+
+Tools: `brain_context` (call first: who I am, the map, pinned nodes, and matches for a topic with paths and cross-links), `brain_search`, `brain_get`, `brain_tree`, `brain_add`, `brain_update`, `brain_link`, `brain_note`, `brain_ingest`.
+
+Without MCP, the same pack comes from the CLI for pasting into any chat:
+
+```bash
+py -3.13 brain/brain.py context                 # overview, about 2.5K tokens
+py -3.13 brain/brain.py context "co-founders"   # plus everything matching a topic
+```
+
+## Adding without friction
+
+- **Quick note**: type plain text in the palette (`Ctrl K`) and pick "Quick note", or `py -3.13 brain/brain.py log "..."`. It lands in Inbox; the status bar shows how many are waiting.
+- **Drop a file**: put a transcript or notes (`.txt .md .vtt .srt .json`, or a Claude Code `.jsonl`) in `brain/inbox/`. While `brain.py serve` runs it picks the file up within about 20 seconds, extracts what it says about me, files it into the right groups, links it, and moves the file to `inbox/done/`. Existing nodes never lose text: new facts get appended as dated lines, links are only added, and the identity node is never touched.
+- **Sort the inbox**: `py -3.13 brain/brain.py sort` turns the quick notes into proper nodes in the right groups.
+- **One file by hand**: `py -3.13 brain/brain.py ingest meeting.txt` (add `--dry-run` to see the proposal first, `--move` to archive the file).
+
+The extractor runs `claude -p` on my own subscription (run `claude login` once in a terminal if it reports an expired session; pick a model with `--model sonnet`). `--local` uses Ollama instead, free but rougher: `--local qwen3.5:9b` after `ollama pull qwen3.5:9b`. `brain.py serve --local` makes the watcher use the local model too; `--no-watch` turns the watcher off.
 
 ## For Ares / Claude
 
