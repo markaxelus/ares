@@ -34,4 +34,5 @@ export type BrainEvent = {
   source: string;
   timestamp: string;
   sequence?: string;
+  dry_run?: boolean;
 };

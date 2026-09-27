@@ -38,8 +38,15 @@ export type Package = {
 };
 /** Packages in flight. Tunnel.tsx drains the ones that have landed. */
 export const packages: Package[] = [];
-/** The factory keeps working for a few seconds after every download. */
-export const factoryState = { busyUntil: 0, downloads: 0 };
+/**
+ * The factory keeps working for a few seconds after every download, and for
+ * as long as Ares is reading a file from the inbox.
+ */
+export const factoryState = {
+  busyUntil: 0,
+  downloads: 0,
+  reading: null as string | null,
+};
 /**
  * Queue a knowledge package.
  * @param to which planet receives it

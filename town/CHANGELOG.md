@@ -2,6 +2,13 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, Ares visibly does its one real job
+
+- Inbox ingestion now shows as Ares working: `ingest_start` keeps the factory busy, pulses a
+  beacon on the station, names the file on the station's hover label and on the activity line;
+  `ingest_done` reports how many places Ares filed before Builder raises them. Dry runs are
+  ignored; a run that never finishes stops counting after three minutes.
+
 ## 2026-09-27, the streak and tended quests show in the world
 
 - A brazier in the town hall yard burns and flickers while the streak is alive and sits as cold

@@ -44,6 +44,13 @@ export function Tunnel({ layout }: { layout: Layout }) {
         `${event.timestamp}:${event.kind}:${event.ids.join(",")}`;
       if (seen.current.has(key)) continue;
       seen.current.add(key);
+      // Ares reads inbox files itself: the factory stays busy until the ingest finishes.
+      if (event.kind === "ingest_start" && !event.dry_run) {
+        const file = event.source.replace(/^ingest:/, "");
+        factoryState.reading = file;
+        factoryState.busyUntil = performance.now() + 180000;
+        useTown.setState({ activity: `Ares is reading ${file}` });
+      }
       for (const transfer of eventTransfers(event)) {
         const ids = transfer.ids
           .filter((id) => (layout.positions.get(id) ?? -1) >= 0)
@@ -66,6 +73,17 @@ export function Tunnel({ layout }: { layout: Layout }) {
                 : `Shipping output back to ${places}`,
           });
         }
+      }
+      if (event.kind === "ingest_done") {
+        const file = event.source.replace(/^ingest:/, ""),
+          n = event.ids.length;
+        factoryState.reading = null;
+        factoryState.busyUntil = performance.now() + 4500;
+        useTown.setState({
+          activity: n
+            ? `Ares filed ${n} place${n === 1 ? "" : "s"} from ${file}`
+            : `Ares found nothing new in ${file}`,
+        });
       }
     }
     if (seen.current.size > 1024)

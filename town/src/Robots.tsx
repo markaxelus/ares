@@ -32,6 +32,7 @@ import {
   brainMouth,
   factoryGate,
   factoryMouth,
+  factoryState,
   RIDE_SECONDS,
   tunnel,
 } from "./transit";
@@ -676,25 +677,51 @@ function AnimatedRobot({
     </group>
   );
 }
-/** The Ares station circles the factory with Ares aboard. */
+/**
+ * The Ares station circles the factory with Ares aboard. Its beacon pulses
+ * while Ares is reading a file from the inbox.
+ */
 function Station() {
-  const ref = useRef<Group>(null!);
+  const ref = useRef<Group>(null!),
+    beacon = useRef<MeshStandardMaterial>(null!);
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime * 0.05;
+    const t = clock.elapsedTime * 0.05,
+      now = performance.now();
     ref.current.position.set(
       FACTORY_POS.x + Math.cos(t) * 8.6,
       FACTORY_POS.y + 3.4,
       FACTORY_POS.z + Math.sin(t) * 8.6,
     );
     ref.current.rotation.y = -t;
+    // An ingest that never reports back stops counting as reading once the busy window ends.
+    if (factoryState.reading && factoryState.busyUntil < now)
+      factoryState.reading = null;
+    beacon.current.emissiveIntensity = factoryState.reading
+      ? 1.6 + Math.sin(clock.elapsedTime * 8) * 1.2
+      : 0.25;
   });
   return (
     <group
       ref={ref}
       scale={0.68}
-      onPointerOver={() => useTown.setState({ hover: "Ares station" })}
+      onPointerOver={() =>
+        useTown.setState({
+          hover: factoryState.reading
+            ? `Ares station · reading ${factoryState.reading}`
+            : "Ares station · idle",
+        })
+      }
       onPointerOut={() => useTown.setState({ hover: null })}
     >
+      <mesh position={[0, 1.7, 0]}>
+        <sphereGeometry args={[0.16, 10, 8]} />
+        <meshStandardMaterial
+          ref={beacon}
+          color="#ffe6a8"
+          emissive="#ffb347"
+          emissiveIntensity={0.25}
+        />
+      </mesh>
       <Suspense fallback={null}>
         <Asset id="station.core" shadow={false} />
         <group position={[0, 0, 1]}>
