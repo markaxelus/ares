@@ -157,6 +157,21 @@ class IntegrationTest(unittest.TestCase):
             self.assertEqual(len(reads()),before+2)
         finally:
             server.stop_event.set();server.shutdown();server.server_close();time.sleep(.2)
+    def test_server_keeps_quiet_when_a_client_disconnects(self):
+        server=b.Server(('127.0.0.1',0),b.Handler)
+        try:
+            quiet=io.StringIO()
+            with contextlib.redirect_stderr(quiet):
+                try: raise ConnectionAbortedError('tab closed')
+                except ConnectionAbortedError: server.handle_error(None,('127.0.0.1',1))
+            self.assertEqual(quiet.getvalue(),'')
+            loud=io.StringIO()
+            with contextlib.redirect_stderr(loud):
+                try: raise ValueError('a real bug')
+                except ValueError: server.handle_error(None,('127.0.0.1',1))
+            self.assertIn('a real bug',loud.getvalue())
+        finally:
+            server.server_close()
 
 if __name__ == '__main__': unittest.main()
 

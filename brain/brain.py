@@ -1589,10 +1589,17 @@ class Handler(BaseHTTPRequestHandler):
     do_POST = do_PUT
 
 
+class Server(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        """A browser closing its tab mid-request is not worth a traceback in the terminal."""
+        if not isinstance(sys.exc_info()[1], (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)):
+            super().handle_error(request, client_address)
+
+
 def cmd_serve(a):
     if not DATA.exists():
         save(load())
-    server = ThreadingHTTPServer((a.host, a.port), Handler)
+    server = Server((a.host, a.port), Handler)
     url = f"http://{a.host}:{a.port}/"
     print(f"Second brain · {url}   (Ctrl+C to stop)")
     stop = threading.Event()
