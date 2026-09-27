@@ -197,10 +197,9 @@ function Part({
     ).releasePointerCapture(e.pointerId);
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) {
       const tile = nearestTile(items.find((p) => p.nodeId === d.id)!.position);
-      useTown.setState({
-        selected: d.id,
-        focus: { planet: "brain", tile: tile.id },
-      });
+      useTown
+        .getState()
+        .look({ selected: d.id, focus: { planet: "brain", tile: tile.id } });
       return;
     }
     // Buildings live on the knowledge planet, whose frame is offset in the world.

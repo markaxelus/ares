@@ -312,7 +312,7 @@ export function BrainWorld({
         tiles={tiles}
         style={style}
         onTile={(tile) =>
-          useTown.setState({
+          useTown.getState().look({
             focus: { planet: "brain", tile },
             selected:
               (layout &&

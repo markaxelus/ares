@@ -47,9 +47,8 @@ function App() {
           setSearch(false);
           setPlaces(false);
         } else if (s.selected) useTown.setState({ selected: null });
-        else if (s.focus)
-          useTown.setState({ focus: null, view: s.focus.planet });
-        else useTown.setState({ view: "system" });
+        else if (s.focus) s.look({ focus: null, view: s.focus.planet });
+        else s.look({ view: "system" });
       }
     };
     window.addEventListener("keydown", key);
@@ -61,12 +60,14 @@ function App() {
   const select = (n: BrainNode) => {
     const tile = layout?.positions.get(n.id);
     if (tile !== undefined && tile >= 0)
-      useTown.setState({ selected: n.id, focus: { planet: "brain", tile } });
+      useTown
+        .getState()
+        .look({ selected: n.id, focus: { planet: "brain", tile } });
     setSearch(false);
     setPlaces(false);
   };
   const go = (view: View) => {
-    useTown.setState({ view, focus: null, selected: null });
+    useTown.getState().look({ view, focus: null, selected: null });
     setPlaces(false);
   };
   const node = brain?.nodes.find((n) => n.id === selected),

@@ -12,9 +12,9 @@ function savedPixelSize() {
     return 0;
   }
 }
-/** A tile the camera orbits around, on either planet. */
+/** A tile the camera lands on, on either planet. */
 export type Focus = { planet: PlanetName; tile: number };
-/** Where the camera rests when nothing is focused. */
+/** Where the camera goes when nothing is focused. */
 export type View = "system" | PlanetName;
 type State = {
   activity: string;
@@ -25,6 +25,7 @@ type State = {
   loadMs: number;
   focus: Focus | null;
   view: View;
+  jump: number;
   selected: string | null;
   brain: Brain | null;
   rev: string;
@@ -34,6 +35,11 @@ type State = {
   events: BrainEvent[];
   hover: string | null;
   setPixelSize: (pixelSize: number) => void;
+  look: (to: {
+    focus?: Focus | null;
+    view?: View;
+    selected?: string | null;
+  }) => void;
   set: (v: Partial<Omit<State, "set">>) => void;
 };
 export const useTown = create<State>((set) => ({
@@ -45,6 +51,7 @@ export const useTown = create<State>((set) => ({
   loadMs: 0,
   focus: null,
   view: "system",
+  jump: 0,
   selected: null,
   brain: null,
   rev: "",
@@ -61,6 +68,8 @@ export const useTown = create<State>((set) => ({
       /* Private windows may refuse storage; the setting still applies now. */
     }
   },
+  // Every navigation bumps jump so the camera moves even to the same place again.
+  look: (to) => set((s) => ({ ...to, jump: s.jump + 1 })),
   set,
 }));
 let request: Promise<void> | null = null;

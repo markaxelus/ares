@@ -1,9 +1,8 @@
-// Scene shell: generic plates, the camera, sun and shadows, moons, stars and the renderer.
+// Scene shell: generic plates, sun and shadows, moons, stars and the renderer.
 // Full resolution with MSAA is the default; the pixel-art pass is an opt-in look.
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { CameraControls, Stars, useProgress } from "@react-three/drei";
-import CameraControlsImpl from "camera-controls";
+import { Stars, useProgress } from "@react-three/drei";
 import {
   Color,
   DirectionalLight,
@@ -18,14 +17,8 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPixelatedPass } from "three/addons/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { Asset } from "./Assets";
-import {
-  BRAIN_POS,
-  FACTORY_POS,
-  planets,
-  plateGeometry,
-  surfaceOf,
-  type Tile,
-} from "./planet";
+import { GlobeCamera, pointer } from "./Camera";
+import { planets, plateGeometry, surfaceOf, type Tile } from "./planet";
 import { useTown, type Focus } from "./store";
 
 export const biomeColors = [
@@ -44,6 +37,7 @@ export type PlateStyle = { color: string; height: number; lighten?: number };
 /**
  * Instanced plates for one planet, in that planet's local frame.
  * @param style memoised by the caller; it runs once per tile per change
+ * @param onTile called for a clean click, never at the end of a camera drag
  */
 export function Plates({
   tiles: set,
@@ -120,7 +114,7 @@ function PlateBatch({
       castShadow
       receiveShadow
       onClick={(e) => {
-        if (e.instanceId !== undefined) {
+        if (e.instanceId !== undefined && pointer.moved < 5) {
           e.stopPropagation();
           onTile?.(batch[e.instanceId].id);
         }
@@ -128,7 +122,7 @@ function PlateBatch({
     />
   );
 }
-/** World point the camera and the pixel grid anchor to for a focus. */
+/** World point the pixel grid anchors to for a focus. */
 export function focusAnchor(focus: Focus) {
   const planet = planets[focus.planet];
   return planet.origin.clone().add(surfaceOf(planet.tiles[focus.tile], 0.35));
@@ -207,77 +201,6 @@ function LoadTelemetry() {
     }
   }, [active, total, brain]);
   return null;
-}
-/**
- * Three ways to look: the whole system, one planet, or one tile. A focused
- * tile becomes the orbit centre with its own normal as up, so buildings can be
- * seen from the side and up close. Left drag orbits, wheel zooms, no panning.
- */
-function Camera() {
-  const dragging = useTown((s) => s.dragging),
-    focus = useTown((s) => s.focus),
-    view = useTown((s) => s.view);
-  const ref = useRef<CameraControlsImpl>(null!);
-  const { camera } = useThree();
-  useEffect(() => {
-    const c = ref.current;
-    c.mouseButtons.right = CameraControlsImpl.ACTION.NONE;
-    c.mouseButtons.middle = CameraControlsImpl.ACTION.DOLLY;
-    c.touches.two = CameraControlsImpl.ACTION.TOUCH_DOLLY;
-    c.touches.three = CameraControlsImpl.ACTION.NONE;
-  }, []);
-  useEffect(() => {
-    const c = ref.current;
-    if (focus) {
-      const planet = planets[focus.planet],
-        tile = planet.tiles[focus.tile],
-        target = focusAnchor(focus);
-      camera.up.copy(tile.normal);
-      c.updateCameraUp();
-      c.minDistance = 1.2;
-      c.maxDistance = 16;
-      c.minPolarAngle = 0.15;
-      c.maxPolarAngle = 1.35;
-      // Stand off along the normal and a little toward the planet's north.
-      const side = new Vector3(0, 1, 0).cross(tile.normal);
-      if (side.lengthSq() < 0.01) side.set(1, 0, 0);
-      const back = tile.normal.clone().cross(side.normalize()).normalize();
-      const eye = target
-        .clone()
-        .addScaledVector(tile.normal, 3.4)
-        .addScaledVector(back, 3.2);
-      void c.setLookAt(eye.x, eye.y, eye.z, target.x, target.y, target.z, true);
-    } else {
-      camera.up.set(0, 1, 0);
-      c.updateCameraUp();
-      c.minPolarAngle = 0;
-      c.maxPolarAngle = Math.PI;
-      const target =
-          view === "brain"
-            ? BRAIN_POS
-            : view === "factory"
-              ? FACTORY_POS
-              : new Vector3(1.5, 0, 0),
-        distance = view === "brain" ? 27 : view === "factory" ? 17 : 62;
-      c.minDistance = view === "system" ? 20 : view === "brain" ? 11 : 7;
-      c.maxDistance = 120;
-      const eye = target
-        .clone()
-        .add(new Vector3(0.35, 0.55, 1).normalize().multiplyScalar(distance));
-      void c.setLookAt(eye.x, eye.y, eye.z, target.x, target.y, target.z, true);
-    }
-  }, [focus, view, camera]);
-  return (
-    <CameraControls
-      ref={ref}
-      makeDefault
-      enabled={!dragging}
-      smoothTime={0.6}
-      draggingSmoothTime={0.08}
-      dollyToCursor={false}
-      infinityDolly={false}
-    />
-  );
 }
 function Sun() {
   const ref = useRef<DirectionalLight>(null!);
@@ -367,7 +290,7 @@ export function PlanetScene({ children }: { children?: React.ReactNode }) {
       <Sun />
       <Stars radius={130} depth={60} count={2200} factor={2.4} fade speed={0} />
       <Moons />
-      <Camera />
+      <GlobeCamera />
       {children}
       <LoadTelemetry />
       <Renderer />
