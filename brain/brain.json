@@ -3,7 +3,7 @@
     "name": "Second brain",
     "owner": "Mark Axelus",
     "version": 3,
-    "updated": "2026-09-21"
+    "updated": "2026-09-27"
   },
   "types": {
     "identity": {
@@ -728,7 +728,8 @@
       "updated": "2026-09-21",
       "parent": "hackathons",
       "order": 1,
-      "pinned": true
+      "pinned": true,
+      "tile": 562
     },
     {
       "id": "cloth-ee",

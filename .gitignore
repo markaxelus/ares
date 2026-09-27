@@ -12,3 +12,8 @@ brain/inbox/
 
 # downloaded asset packs; curated models live in town/public/models
 town/assets/raw/
+
+# Town build and transient event stream
+brain/events.jsonl
+town/node_modules/
+town/dist/

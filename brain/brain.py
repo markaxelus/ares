@@ -35,6 +35,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import mimetypes
+from contextvars import ContextVar
 import os
 import re
 import shlex
@@ -45,10 +47,10 @@ import threading
 import time
 import urllib.request
 import webbrowser
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "brain.json"
@@ -60,7 +62,28 @@ DONE = INBOX / "done"
 INBOX_ID = "inbox"
 CONFIDENCE = ("high", "medium", "low")
 QUERY_KEYS = {"type", "t", "tag", "conf", "is", "since", "rel", "link", "id", "in"}
-_lock = threading.Lock()
+_lock = threading.RLock()
+EVENTS = HERE / "events.jsonl"
+TOWN = HERE.parent / "town" / "dist"
+_event_source = ContextVar("event_source", default="brain")
+_pending_events = threading.local()
+
+
+def emit_event(kind: str, ids=(), source: str | None = None, **details) -> None:
+    """One append syscall per record; never write user content or break a brain command."""
+    record = {"kind": kind, "ids": list(dict.fromkeys(ids)),
+              "source": source or _event_source.get(),
+              "timestamp": datetime.now(timezone.utc).isoformat(), **details}
+    raw = (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
+    try:
+        fd = os.open(EVENTS, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0), 0o600)
+        try:
+            os.write(fd, raw)
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        print(f"event log unavailable: {exc}", file=sys.stderr)
+
 
 
 # ----------------------------------------------------------------- storage
@@ -77,12 +100,15 @@ def rev_of(raw: bytes) -> str:
     return hashlib.sha1(raw).hexdigest()[:12]
 
 
-def load() -> dict:
+def load(*, audit=True) -> dict:
     if not DATA.exists():
         return {"meta": {"name": "Second brain", "version": 1, "updated": today()},
                 "types": {}, "rels": {}, "nodes": [], "edges": []}
     with DATA.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        doc = json.load(f)
+    if audit:
+        emit_event("mcp_read", [n["id"] for n in doc["nodes"]])
+    return doc
 
 
 def snapshot() -> None:
@@ -109,11 +135,34 @@ def save(doc: dict) -> str:
     raw = dumps(doc).encode("utf-8")
     with _lock:
         if DATA.exists() and DATA.read_bytes() == raw:
+            emit_event("mcp_write", [], rev=rev_of(raw), unchanged=True)
+            for event in getattr(_pending_events, "items", []):
+                emit_event(**event)
+            _pending_events.items = []
             return rev_of(raw)
+        before = load(audit=False)
         snapshot()
         tmp = DATA.with_suffix(".json.tmp")
         tmp.write_bytes(raw)
         os.replace(tmp, DATA)
+        old = node_index(before)
+        new = node_index(doc)
+        for nid, node in new.items():
+            if nid not in old:
+                emit_event("node_added", [nid])
+                if node.get("parent") == INBOX_ID and node.get("type") == "note":
+                    emit_event("note", [nid, INBOX_ID])
+            elif node != old[nid]:
+                emit_event("node_updated", [nid])
+        edges = {e["id"] for e in before["edges"]}
+        for edge in doc["edges"]:
+            if edge["id"] not in edges:
+                emit_event("link_added", [edge["from"], edge["to"]], edge_id=edge["id"])
+        changed = [nid for nid in old.keys() | new.keys() if old.get(nid) != new.get(nid)]
+        emit_event("mcp_write", changed, rev=rev_of(raw))
+    for event in getattr(_pending_events, "items", []):
+        emit_event(**event)
+    _pending_events.items = []
     return rev_of(raw)
 
 
@@ -147,6 +196,8 @@ def validate(doc: dict) -> list[str]:
             errors.append(f"node '{nid}' has no title")
         if "tags" in n and not (isinstance(n["tags"], list) and all(isinstance(t, str) for t in n["tags"])):
             errors.append(f"node '{nid}' tags must be a list of strings")
+        if "tile" in n and (type(n["tile"]) is not int or not 0 <= n["tile"] < 1002):
+            errors.append(f"node '{nid}' tile must be an integer from 0 to 1001")
         if n.get("confidence") not in (None, *CONFIDENCE):
             errors.append(f"node '{nid}' confidence must be one of {', '.join(CONFIDENCE)}")
     parents = {n["id"]: n.get("parent") for n in doc["nodes"] if isinstance(n, dict) and isinstance(n.get("id"), str)}
@@ -1113,6 +1164,8 @@ def extract(doc: dict, text: str, source: str, engine: str = "claude", model: st
 
 
 def ingest_path(doc: dict, path: Path, engine: str, model: str | None, dry: bool = False, log=print) -> dict:
+    emit_event("ingest_start", [], source=f"ingest:{path.name}", dry_run=dry)
+    before = {n["id"]: dict(n) for n in doc["nodes"]}
     text = read_text_any(path).strip()
     if not text:
         log(f"skip {path.name}: empty"); return {"added": 0, "updated": 0, "skipped": 0, "links": 0}
@@ -1128,6 +1181,10 @@ def ingest_path(doc: dict, path: Path, engine: str, model: str | None, dry: bool
         for k in total:
             total[k] += r[k]
         log(f"  part {i}: +{r['added']} nodes, {r['updated']} updated, +{r['links']} links")
+    if not dry:
+        ids = [n["id"] for n in doc["nodes"] if before.get(n["id"]) != n]
+        _pending_events.items = getattr(_pending_events, "items", []) + [
+            {"kind": "ingest_done", "ids": ids, "source": f"ingest:{path.name}"}]
     return total
 
 
@@ -1177,11 +1234,13 @@ def cmd_sort(a):
         raise SystemExit(str(exc))
     if a.dry_run:
         print(json.dumps(prop, ensure_ascii=False, indent=2)); return
+    before = {n["id"]: dict(n) for n in doc["nodes"]}
     r = merge_doc(doc, prop, append=True)
     if r["added"] or r["updated"]:
         keep = {n["id"] for n in notes} if a.keep else set()
         doc["nodes"] = [n for n in doc["nodes"] if n["id"] not in {x["id"] for x in notes} or n["id"] in keep]
     save(doc)
+    emit_event("sort", [n["id"] for n in doc["nodes"] if before.get(n["id"]) != n], source="sort")
     print(f"sorted {len(notes)} note(s): +{r['added']} nodes, {r['updated']} updated, +{r['links']} links")
 
 
@@ -1199,6 +1258,8 @@ def watch_inbox(interval: float, engine: str, model: str | None, log=print, stop
             if seen.get(pth.name) == mtime:
                 continue
             seen[pth.name] = mtime
+            emit_event("note", [INBOX_ID], source=f"watcher:{pth.name}")
+            token = _event_source.set(f"watcher:{pth.name}")
             try:
                 doc = load()
                 r = ingest_path(doc, pth, engine, model, log=log)
@@ -1206,7 +1267,10 @@ def watch_inbox(interval: float, engine: str, model: str | None, log=print, stop
                 shutil.move(str(pth), str(DONE / pth.name))
                 log(f"ingested {pth.name}: +{r['added']} nodes, {r['updated']} updated, +{r['links']} links")
             except Exception as exc:  # noqa: BLE001
+                _pending_events.items = []
                 log(f"ingest failed for {pth.name}: {exc}")
+            finally:
+                _event_source.reset(token)
         if stop is None:
             time.sleep(interval)
         elif stop.wait(interval):
@@ -1248,7 +1312,28 @@ MCP_TOOLS = [
 
 
 def mcp_call(name: str, args: dict) -> str:
-    doc = load()
+    token = _event_source.set(f"mcp:{name}")
+    try:
+        result = _mcp_call(name, args)
+        if name in ("brain_context", "brain_search", "brain_get", "brain_tree"):
+            doc = load(audit=False)
+            mentioned = set(re.findall(r"`([^`\n]+)`", result))
+            ids = [n["id"] for n in doc["nodes"] if n["id"] in mentioned]
+            if name == "brain_context":
+                roots = children_of(doc, None)
+                if len(roots) == 1:
+                    ids.insert(0, roots[0]["id"])
+            emit_event("mcp_read", ids)
+        return result
+    except Exception:
+        _pending_events.items = []
+        raise
+    finally:
+        _event_source.reset(token)
+
+
+def _mcp_call(name: str, args: dict) -> str:
+    doc = load(audit=False)
     if name == "brain_context":
         return context_pack(doc, args.get("topic") or None, int(args.get("budget") or 2500))
     if name == "brain_search":
@@ -1412,8 +1497,20 @@ class Handler(BaseHTTPRequestHandler):
             if not INDEX.exists():
                 self._send(404, b"index.html is missing", "text/plain"); return
             self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
+        elif path == "/api/events":
+            self._events()
+        elif path == "/town" or path.startswith("/town/"):
+            relative = unquote(path.removeprefix("/town")).lstrip("/") or "index.html"
+            target = (TOWN / relative).resolve()
+            if not target.is_relative_to(TOWN.resolve()):
+                self._send(403, b"forbidden", "text/plain"); return
+            if not target.is_file():
+                self._send(404, b"Town is not built. Run npm install and npm run build in town/.", "text/plain"); return
+            ctype = {".js": "text/javascript", ".glb": "model/gltf-binary"}.get(target.suffix) or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+            self._send(200, target.read_bytes(), ctype)
         elif path == "/api/brain":
             raw = DATA.read_bytes() if DATA.exists() else dumps(load()).encode("utf-8")
+            emit_event("mcp_read", [n["id"] for n in json.loads(raw)["nodes"]], source="http:brain")
             body = b'{"rev":"' + rev_of(raw).encode() + b'","doc":' + raw.strip() + b"}"
             self._send(200, body, "application/json; charset=utf-8")
         elif path == "/api/markdown":
@@ -1421,7 +1518,43 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send(404, b"not found", "text/plain")
 
+    def _events(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+        try:
+            EVENTS.touch(exist_ok=True)
+            with EVENTS.open("rb") as stream:
+                end = stream.seek(0, 2)
+                try:
+                    offset = int(self.headers.get("Last-Event-ID", end))
+                except ValueError:
+                    offset = end
+                stream.seek(offset if 0 <= offset <= end else end)
+                self.wfile.write(b": connected\n\n"); self.wfile.flush()
+                last_ping = time.monotonic()
+                while not (getattr(self.server, "stop_event", None) and self.server.stop_event.is_set()):
+                    pos = stream.tell()
+                    line = stream.readline()
+                    if line.endswith(b"\n"):
+                        self.wfile.write(f"id: {stream.tell()}\ndata: ".encode() + line + b"\n")
+                        self.wfile.flush()
+                    else:
+                        stream.seek(pos)
+                        if time.monotonic() - last_ping >= 10:
+                            self.wfile.write(b": heartbeat\n\n"); self.wfile.flush()
+                            last_ping = time.monotonic()
+                        time.sleep(0.15)
+        except (OSError, ConnectionError):
+            pass
+
     def do_PUT(self):
+        with _lock:
+            self._put_brain()
+
+    def _put_brain(self):
         if urlparse(self.path).path != "/api/brain":
             self._send(404, b"not found", "text/plain"); return
         length = int(self.headers.get("Content-Length") or 0)
@@ -1438,7 +1571,11 @@ class Handler(BaseHTTPRequestHandler):
         if errors:
             self._json(400, {"errors": errors}); return
         try:
-            rev = save(doc)
+            token = _event_source.set("http:brain")
+            try:
+                rev = save(doc)
+            finally:
+                _event_source.reset(token)
         except OSError as exc:
             self._json(500, {"errors": [str(exc)]}); return
         self._json(200, {"rev": rev})
@@ -1453,6 +1590,7 @@ def cmd_serve(a):
     url = f"http://{a.host}:{a.port}/"
     print(f"Second brain · {url}   (Ctrl+C to stop)")
     stop = threading.Event()
+    server.stop_event = stop
     if not a.no_watch:
         engine = "ollama" if a.local else "claude"
         model = a.model or (a.local if isinstance(a.local, str) and a.local != "yes" else None)
@@ -1588,7 +1726,11 @@ def main(argv=None):
         except Exception:
             pass
     args = build_parser().parse_args(argv)
-    args.fn(args)
+    token = _event_source.set(f"cli:{args.cmd}")
+    try:
+        args.fn(args)
+    finally:
+        _event_source.reset(token)
 
 
 if __name__ == "__main__":

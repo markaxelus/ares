@@ -1432,6 +1432,7 @@ $('#searchBtn').onclick = () => openPalette();
 $('#kbdHint').textContent = isMac ? '⌘K' : 'Ctrl K';
 $('#newBtn').onclick = () => startCreate();
 $('#moreBtn').onclick = e => { const r = e.currentTarget.getBoundingClientRect(); showMenu([
+  { label: 'Town', run: () => window.open('/town/', '_blank') },
   { label: 'Overview: close every group', run: overview }, { label: 'Open top-level groups only', run: levelOne }, { label: 'Open every group', run: expandAll },
   { sep: true }, { label: 'Export JSON', run: exportJSON }, { label: 'Copy everything as Markdown', run: copyMarkdown }, { label: 'Import JSON…', run: () => $('#fileIn').click() },
   { sep: true }, { label: 'Re-run layout', run: relayout }, { label: 'Toggle dark mode', kbd: 'T', run: toggleTheme }, { label: 'Keyboard shortcuts', kbd: '?', run: showHelp },
