@@ -1,13 +1,19 @@
-// The factory: Ares HQ as an industrial planet. A conveyor belt rings it, machines
-// and robot arms work beside the belt, robots charge on floor pads, relay
-// satellites circle overhead, and knowledge from the tunnel lands on the scanner.
+// The factory: Ares HQ as an industrial planet that is also a neural network.
+// Knowledge lands on the scanner, rides a belt through named stations, and
+// twelve named neurons joined by axons fire signals all the time, cascading
+// whenever a package is downloaded. Robots charge in the yard by the gate.
 import { Suspense, useCallback, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
+  CatmullRomCurve3,
   Group,
+  InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
+  Quaternion,
+  TubeGeometry,
   Vector3,
 } from "three";
 import {
@@ -21,10 +27,9 @@ import { Plates, type PlateStyle } from "./Scene";
 import {
   FACTORY_POS,
   FACTORY_RADIUS,
-  facingOf,
   factoryTiles,
+  nearestTile,
   orientationOf,
-  ring,
   slerpNormal,
   surfaceOf,
   travelFrame,
@@ -34,18 +39,59 @@ import {
 import { factoryGate, factoryState } from "./transit";
 import { hash } from "./layout";
 import { useTown } from "./store";
-type Machine = { tile: number; asset: string; toward: number };
 export type WorkerRole = "courier" | "builder" | "archivist";
+type Station = {
+  tile: number;
+  asset: string;
+  label: string;
+  facing: Vector3;
+  arm: boolean;
+};
+type Neuron = { tile: number; name: string; color: string };
+type Axon = { from: number; to: number; points: Vector3[]; length: number };
 export type FactoryLayout = {
-  belt: number[];
   gate: number;
-  machines: Machine[];
-  arms: Machine[];
+  beltTiles: Set<number>;
+  stations: Station[];
+  neurons: Neuron[];
+  axons: Axon[];
   pads: Record<WorkerRole, number>;
   cogs: number[];
   decor: Placement[];
 };
-const spin = (tile: number) => (hash(`f:${tile}:spin`) % 628) / 100;
+const R = FACTORY_RADIUS,
+  BELT_R = R + 0.16,
+  up = new Vector3(0, 1, 0);
+const gateNormal = factoryGate.normal.clone();
+const beltAxis = gateNormal
+  .clone()
+  .cross(new Vector3(0.25, 1, 0.1))
+  .normalize();
+const beltAhead = beltAxis.clone().cross(gateNormal).normalize();
+/** Unit direction of the belt circle at angle theta; theta 0 is the gate. */
+export function beltPoint(theta: number) {
+  return gateNormal
+    .clone()
+    .multiplyScalar(Math.cos(theta))
+    .addScaledVector(beltAhead, Math.sin(theta));
+}
+function beltTangent(theta: number) {
+  return gateNormal
+    .clone()
+    .multiplyScalar(-Math.sin(theta))
+    .addScaledVector(beltAhead, Math.cos(theta));
+}
+/** Orientation on a tile whose local +Z axis points at a local-frame point. */
+function facingPoint(tile: Tile, toward: Vector3) {
+  const q = orientationOf(tile);
+  const dir = toward
+    .clone()
+    .sub(tile.center)
+    .applyQuaternion(q.clone().invert());
+  return q.multiply(
+    new Quaternion().setFromAxisAngle(up, Math.atan2(dir.x, dir.z)),
+  );
+}
 function place(
   key: string,
   asset: string,
@@ -64,47 +110,71 @@ function place(
     label,
   };
 }
+const spin = (tile: number) => (hash(`f:${tile}:spin`) % 628) / 100;
+const STATIONS: [string, string, boolean][] = [
+  ["factory.hopper", "Sorter", false],
+  ["factory.machine", "Parser", false],
+  ["factory.arm", "Assembler", true],
+  ["factory.press", "Memory press", false],
+  ["factory.machine-fortified", "Planner", false],
+  ["factory.piston", "Compressor", false],
+  ["factory.press", "Core press", false],
+  ["factory.arm-b", "Welder", true],
+  ["factory.console", "Router", false],
+  ["factory.hopper", "Sorter", false],
+  ["factory.machine", "Tokenizer", false],
+  ["factory.screen", "Monitor", false],
+];
+const NEURONS = [
+  "Attention",
+  "Recall",
+  "Curiosity",
+  "Planning",
+  "Memory",
+  "Language",
+  "Vision",
+  "Reasoning",
+  "Intuition",
+  "Focus",
+  "Empathy",
+  "Habit",
+];
+const NEURON_COLORS = ["#7fd0ff", "#b39dff", "#ffd27a", "#8ff0c8"];
 /** Everything sits where geometry puts it; nothing here depends on the brain. */
 export const factoryLayout: FactoryLayout = (() => {
   const set = factoryTiles,
-    gate = factoryGate.id;
-  const belt = ring(set, new Vector3(0.3, 1, 0.2));
-  const onBelt = new Set(belt),
-    taken = new Set<number>([gate, ...set[gate].neighbors]);
+    gate = factoryGate.id,
+    taken = new Set<number>([gate]);
+  const beltTiles = new Set<number>();
+  for (let i = 0; i < 240; i++)
+    beltTiles.add(nearestTile(beltPoint((i / 240) * Math.PI * 2), set).id);
   const free = (id: number) =>
-    !onBelt.has(id) && !taken.has(id) && set[id].neighbors.length === 6;
-  const machines: Machine[] = [],
-    arms: Machine[] = [];
-  const kinds = [
-    "factory.machine",
-    "factory.hopper",
-    "factory.press",
-    "factory.machine-fortified",
-    "factory.piston",
-    "factory.console",
-    "factory.screen",
-    "factory.container",
-  ];
-  belt.forEach((id, i) => {
-    if (i % 3 !== 1) return;
-    const side = set[id].neighbors.filter(free);
-    const pick = side[hash(`side:${id}`) % Math.max(1, side.length)];
-    if (pick === undefined) return;
-    taken.add(pick);
-    if ((machines.length + arms.length) % 4 === 3)
-      arms.push({
-        tile: pick,
-        asset: arms.length % 2 ? "factory.arm-b" : "factory.arm",
-        toward: id,
+    !beltTiles.has(id) && !taken.has(id) && set[id].neighbors.length === 6;
+  // Stations beside the belt, alternating sides, in processing order.
+  const stations: Station[] = [];
+  STATIONS.forEach(([asset, label, arm], k) => {
+    const theta = ((k + 1) / (STATIONS.length + 1)) * Math.PI * 2,
+      side = k % 2 ? 1 : -1,
+      centre = beltPoint(theta);
+    for (const lean of [0.2, 0.32]) {
+      const site = centre
+        .clone()
+        .multiplyScalar(Math.cos(lean))
+        .addScaledVector(beltAxis, side * Math.sin(lean));
+      const tile = nearestTile(site, set).id;
+      if (!free(tile)) continue;
+      taken.add(tile);
+      stations.push({
+        tile,
+        asset,
+        label,
+        facing: centre.clone().multiplyScalar(R),
+        arm,
       });
-    else
-      machines.push({
-        tile: pick,
-        asset: kinds[machines.length % kinds.length],
-        toward: id,
-      });
+      break;
+    }
   });
-  // Charging pads two or three steps from the gate, off the belt.
+  // Charging yard: three pads two steps from the gate, off the belt.
   const rings: number[][] = [[gate]],
     seen = new Set([gate]);
   for (let d = 1; d <= 3; d++) {
@@ -124,70 +194,169 @@ export const factoryLayout: FactoryLayout = (() => {
     builder: padTiles[1] ?? gate,
     archivist: padTiles[2] ?? gate,
   };
-  const decor: Placement[] = [],
-    cogs: number[] = [];
-  const crane = [...rings[3], ...rings[2]].find(free);
-  if (crane !== undefined) {
-    taken.add(crane);
-    decor.push(
-      place(
-        "crane",
-        "factory.crane",
-        set[crane],
-        1,
-        turnedOf(set[crane], 0.7),
-        0.18,
-        "Loading crane",
-      ),
-    );
+  const decor: Placement[] = [];
+  // Yard clutter: a container beside each pad, cones by the gate, screens at intake.
+  for (const [role, padTile] of Object.entries(pads)) {
+    const spot = set[padTile].neighbors.find(free);
+    if (spot !== undefined) {
+      taken.add(spot);
+      decor.push(
+        place(
+          `yard:${role}`,
+          "factory.container",
+          set[spot],
+          1,
+          turnedOf(set[spot], spin(spot)),
+          0.18,
+          "Spare parts",
+        ),
+      );
+    }
   }
+  rings[1]
+    .filter(free)
+    .slice(0, 2)
+    .forEach((t, i) => {
+      taken.add(t);
+      decor.push(
+        place(
+          `intake:${t}`,
+          i ? "factory.screen" : "factory.warning",
+          set[t],
+          1,
+          facingPoint(set[t], set[gate].center),
+          0.18,
+          i ? "Intake monitor" : "Mind the belt",
+        ),
+      );
+    });
+  // The core district: crane and a second console beside the core press.
+  const core = stations.find((s) => s.label === "Core press");
+  if (core) {
+    const around = set[core.tile].neighbors.filter(free);
+    const [craneTile, consoleTile] = around;
+    if (craneTile !== undefined) {
+      taken.add(craneTile);
+      decor.push(
+        place(
+          "crane",
+          "factory.crane",
+          set[craneTile],
+          1,
+          facingPoint(set[craneTile], set[core.tile].center),
+          0.18,
+          "Loading crane",
+        ),
+      );
+    }
+    if (consoleTile !== undefined) {
+      taken.add(consoleTile);
+      decor.push(
+        place(
+          "core-console",
+          "factory.console",
+          set[consoleTile],
+          1,
+          facingPoint(set[consoleTile], set[core.tile].center),
+          0.18,
+          "Core console",
+        ),
+      );
+    }
+  }
+  // Neurons spread evenly over the planet on a Fibonacci sphere.
+  const neurons: Neuron[] = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  NEURONS.forEach((name, i) => {
+    const y = 1 - (2 * (i + 0.5)) / NEURONS.length,
+      r = Math.sqrt(1 - y * y),
+      phi = i * golden;
+    const dir = new Vector3(r * Math.cos(phi), y, r * Math.sin(phi));
+    let tile = nearestTile(dir, set).id;
+    if (!free(tile)) tile = set[tile].neighbors.find(free) ?? -1;
+    if (tile < 0) return;
+    taken.add(tile);
+    neurons.push({
+      tile,
+      name,
+      color: NEURON_COLORS[i % NEURON_COLORS.length],
+    });
+  });
+  // Axons: each neuron to its two nearest, plus the intake and the core into the web.
+  const nodes = [
+    ...neurons.map((n) => n.tile),
+    gate,
+    ...(core ? [core.tile] : []),
+  ];
+  const pairs = new Set<string>();
+  const link = (a: number, b: number) => {
+    if (a !== b) pairs.add(a < b ? `${a}:${b}` : `${b}:${a}`);
+  };
+  for (const a of nodes) {
+    const nearest = nodes
+      .filter((b) => b !== a)
+      .sort(
+        (u, v) =>
+          set[v].normal.dot(set[a].normal) - set[u].normal.dot(set[a].normal),
+      )
+      .slice(0, 2);
+    nearest.forEach((b) => link(a, b));
+  }
+  const axons: Axon[] = [...pairs].map((key) => {
+    const [from, to] = key.split(":").map(Number);
+    const a = set[from].normal,
+      b = set[to].normal,
+      length = Math.acos(Math.max(-1, Math.min(1, a.dot(b)))) * R;
+    const points: Vector3[] = [];
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14;
+      points.push(
+        slerpNormal(a, b, t).multiplyScalar(
+          R + 0.34 + Math.sin(t * Math.PI) * Math.min(0.5, length * 0.12),
+        ),
+      );
+    }
+    return { from, to, points, length };
+  });
+  // Spinning cogs and domes on the pentagons.
+  const cogs: number[] = [];
   for (const t of set) {
     if (t.neighbors.length === 5) {
-      if (!onBelt.has(t.id))
+      if (!beltTiles.has(t.id))
         decor.push(
-          place(`dome:${t.id}`, "ares.dome", t, 1.1, turnedOf(t, spin(t.id))),
+          place(
+            `dome:${t.id}`,
+            "ares.dome",
+            t,
+            1.1,
+            turnedOf(t, spin(t.id)),
+            0.18,
+            "Memory dome",
+          ),
         );
       continue;
     }
-    if (!free(t.id)) continue;
-    const roll = hash(`f:${t.id}`) % 21;
-    if (roll === 0 && cogs.length < 4) {
+    if (free(t.id) && hash(`cog:${t.id}`) % 37 === 0 && cogs.length < 4) {
       cogs.push(t.id);
       taken.add(t.id);
-    } else if (roll === 1)
-      decor.push(
-        place(`cone:${t.id}`, "factory.warning", t, 1, turnedOf(t, spin(t.id))),
-      );
-    else if (roll === 2)
-      decor.push(
-        place(`box:${t.id}`, "factory.box", t, 1, turnedOf(t, spin(t.id))),
-      );
-    else if (roll === 3)
-      decor.push(
-        place(
-          `container:${t.id}`,
-          "factory.container",
-          t,
-          1,
-          turnedOf(t, spin(t.id)),
-        ),
-      );
-    else if (roll === 4)
-      decor.push(
-        place(`pipe:${t.id}`, "factory.pipe", t, 0.7, turnedOf(t, spin(t.id))),
-      );
+    }
   }
-  return { belt, gate, machines, arms, pads, cogs, decor };
+  return { gate, beltTiles, stations, neurons, axons, pads, cogs, decor };
 })();
-const onBelt = new Set(factoryLayout.belt);
+const beltNeighbours = new Set<number>();
+for (const id of factoryLayout.beltTiles)
+  for (const n of factoryTiles[id].neighbors)
+    if (!factoryLayout.beltTiles.has(n)) beltNeighbours.add(n);
 const plateStyle = (tile: Tile): PlateStyle =>
-  onBelt.has(tile.id)
-    ? { color: "#22272e", height: 0.05 }
-    : {
-        color: hash(`plate:${tile.id}`) % 9 === 0 ? "#b7712a" : "#464c55",
-        height: 0.08,
-        lighten: ((hash(`shade:${tile.id}`) % 5) - 2) * 0.02,
-      };
+  factoryLayout.beltTiles.has(tile.id)
+    ? { color: "#22272e", height: 0.06 }
+    : beltNeighbours.has(tile.id) && hash(`stripe:${tile.id}`) % 3 === 0
+      ? { color: "#b7712a", height: 0.08 }
+      : {
+          color: "#464c55",
+          height: 0.08,
+          lighten: ((hash(`shade:${tile.id}`) % 5) - 2) * 0.02,
+        };
 const labels: Record<WorkerRole, string> = {
   courier: "Courier",
   builder: "Builder",
@@ -197,32 +366,33 @@ export function FactoryWorld() {
   const placements = useMemo(() => {
     const L = factoryLayout,
       out: Placement[] = [...L.decor];
-    L.belt.forEach((id, i) => {
-      const a = factoryTiles[id],
-        b = factoryTiles[L.belt[(i + 1) % L.belt.length]];
-      const n = slerpNormal(a.normal, b.normal, 0.5),
-        tangent = slerpNormal(a.normal, b.normal, 0.55).sub(n).normalize();
+    // Belt pieces evenly along the exact circle, so the loop is seamless.
+    const pieces = Math.round((2 * Math.PI * BELT_R) / 1.0);
+    for (let i = 0; i < pieces; i++) {
+      const theta = ((i + 0.5) / pieces) * Math.PI * 2,
+        n = beltPoint(theta);
       out.push({
         key: `belt:${i}`,
         asset: "factory.conveyor",
-        position: n.clone().multiplyScalar(FACTORY_RADIUS + 0.14),
-        quaternion: travelFrame(n, tangent, "x"),
+        position: n.clone().multiplyScalar(BELT_R),
+        quaternion: travelFrame(n, beltTangent(theta), "x"),
         scale: 1,
         label: "Conveyor belt",
       });
-    });
-    for (const m of L.machines)
-      out.push(
-        place(
-          `machine:${m.tile}`,
-          m.asset,
-          factoryTiles[m.tile],
-          1,
-          facingOf(factoryTiles[m.tile], factoryTiles[m.toward]),
-          0.18,
-          "Factory machine",
-        ),
-      );
+    }
+    for (const s of L.stations)
+      if (!s.arm)
+        out.push(
+          place(
+            `station:${s.tile}`,
+            s.asset,
+            factoryTiles[s.tile],
+            1,
+            facingPoint(factoryTiles[s.tile], s.facing),
+            0.18,
+            s.label,
+          ),
+        );
     for (const [role, tile] of Object.entries(L.pads))
       out.push(
         place(
@@ -254,23 +424,25 @@ export function FactoryWorld() {
         tiles={factoryTiles}
         style={plateStyle}
         onTile={(tile) =>
-          useTown.setState({
-            focus: { planet: "factory", tile },
-            selected: null,
-          })
+          useTown
+            .getState()
+            .look({ focus: { planet: "factory", tile }, selected: null })
         }
       />
       <Suspense fallback={null}>
         <AssetBatches placements={placements} />
         <BeltPackages />
-        {factoryLayout.arms.map((a) => (
-          <Arm key={a.tile} machine={a} />
-        ))}
+        {factoryLayout.stations
+          .filter((s) => s.arm)
+          .map((s) => (
+            <Arm key={s.tile} station={s} />
+          ))}
         {factoryLayout.cogs.map((tile, i) => (
           <Cog key={tile} tile={tile} phase={i} />
         ))}
         <Satellites />
       </Suspense>
+      <NeuralWeb />
       {Object.values(factoryLayout.pads).map((tile) => (
         <PadGlow key={tile} tile={tile} />
       ))}
@@ -278,60 +450,44 @@ export function FactoryWorld() {
     </group>
   );
 }
-const BOXES = 14;
+const BOXES = 16;
 /** Packages that ride the belt forever, faster while the factory is busy. */
 function BeltPackages() {
-  const belt = factoryLayout.belt,
-    L = belt.length;
-  const normals = useMemo(
-    () => belt.map((id) => factoryTiles[id].normal),
-    [belt],
-  );
   const travelled = useRef(0);
   useFrame((_, dt) => {
     travelled.current +=
-      dt * (factoryState.busyUntil > performance.now() ? 2.4 : 0.8);
+      dt * (factoryState.busyUntil > performance.now() ? 0.45 : 0.15);
   });
-  const n = useMemo(() => new Vector3(), []),
-    tangent = useMemo(() => new Vector3(), []),
-    position = useMemo(() => new Vector3(), []),
+  const position = useMemo(() => new Vector3(), []),
     one = useMemo(() => new Vector3(1, 1, 1), []);
   const update = useCallback(
     (i: number, m: Matrix4) => {
-      const s = (travelled.current + (i * L) / BOXES) % L,
-        k = Math.floor(s),
-        f = s - k,
-        a = normals[k],
-        b = normals[(k + 1) % L];
-      n.copy(slerpNormal(a, b, f));
-      tangent
-        .copy(slerpNormal(a, b, Math.min(1, f + 0.05)))
-        .sub(n)
-        .normalize();
-      position.copy(n).multiplyScalar(FACTORY_RADIUS + 0.14 + 0.2);
-      m.compose(position, travelFrame(n, tangent, "x"), one);
+      const theta = travelled.current + (i / BOXES) * Math.PI * 2,
+        n = beltPoint(theta);
+      position.copy(n).multiplyScalar(BELT_R + 0.2);
+      m.compose(position, travelFrame(n, beltTangent(theta), "x"), one);
     },
-    [L, normals, n, tangent, position, one],
+    [position, one],
   );
   return <MovingAssets id="factory.box" count={BOXES} update={update} />;
 }
-function Arm({ machine }: { machine: Machine }) {
+function Arm({ station }: { station: Station }) {
   const ref = useRef<Group>(null!);
-  const tile = factoryTiles[machine.tile];
+  const tile = factoryTiles[station.tile];
   useFrame(({ clock }) => {
     const busy = factoryState.busyUntil > performance.now();
     ref.current.rotation.y =
-      Math.sin(clock.elapsedTime * (busy ? 3.4 : 1.1) + machine.tile) * 0.9;
+      Math.sin(clock.elapsedTime * (busy ? 3.4 : 1.1) + station.tile) * 0.9;
   });
   return (
     <group
       position={surfaceOf(tile)}
-      quaternion={facingOf(tile, factoryTiles[machine.toward])}
-      onPointerOver={() => useTown.setState({ hover: "Robot arm" })}
+      quaternion={facingPoint(tile, station.facing)}
+      onPointerOver={() => useTown.setState({ hover: station.label })}
       onPointerOut={() => useTown.setState({ hover: null })}
     >
       <group ref={ref}>
-        <Asset id={machine.asset} />
+        <Asset id={station.asset} />
       </group>
     </group>
   );
@@ -347,6 +503,161 @@ function Cog({ tile, phase }: { tile: number; phase: number }) {
       <group ref={ref}>
         <Asset id="factory.cog" />
       </group>
+    </group>
+  );
+}
+const MAX_SIGNALS = 160;
+type Signal = { axon: number; t: number; forward: boolean; speed: number };
+/**
+ * The neural web: neuron cores on pedestals, axons arching between them, and
+ * signals that never stop. Idle, a few fire a second; after a download the
+ * intake neuron fires and every arrival fans out, so activity ripples across
+ * the whole planet while the factory is busy.
+ */
+function NeuralWeb() {
+  const { neurons, axons, gate } = factoryLayout;
+  const geometries = useMemo(
+    () =>
+      axons.map(
+        (a) => new TubeGeometry(new CatmullRomCurve3(a.points), 28, 0.035, 6),
+      ),
+    [axons],
+  );
+  const byTile = useMemo(() => {
+    const map = new Map<number, number[]>();
+    axons.forEach((a, i) => {
+      map.set(a.from, [...(map.get(a.from) || []), i]);
+      map.set(a.to, [...(map.get(a.to) || []), i]);
+    });
+    return map;
+  }, [axons]);
+  const signals = useRef<Signal[]>([]),
+    glow = useRef(new Map<number, number>()),
+    spawnClock = useRef(0),
+    downloads = useRef(factoryState.downloads);
+  const cores = useRef<(MeshStandardMaterial | null)[]>([]);
+  const sparks = useRef<InstancedMesh>(null!);
+  const dummy = useMemo(() => new Object3D(), []);
+  const fire = (tile: number, exclude = -1) => {
+    const options = (byTile.get(tile) || []).filter((i) => i !== exclude);
+    if (!options.length || signals.current.length >= MAX_SIGNALS) return;
+    const axon = options[Math.floor(Math.random() * options.length)];
+    signals.current.push({
+      axon,
+      t: 0,
+      forward: axons[axon].from === tile,
+      speed: 2.4 + Math.random() * 1.2,
+    });
+  };
+  useFrame(({ clock }, dt) => {
+    const now = performance.now(),
+      busy = factoryState.busyUntil > now;
+    if (factoryState.downloads !== downloads.current) {
+      downloads.current = factoryState.downloads;
+      glow.current.set(gate, now + 600);
+      for (let i = 0; i < 3; i++) fire(gate);
+    }
+    spawnClock.current += dt;
+    const interval = busy ? 0.12 : 0.45;
+    while (spawnClock.current > interval) {
+      spawnClock.current -= interval;
+      const from = neurons[Math.floor(Math.random() * neurons.length)];
+      if (from) fire(from.tile);
+    }
+    const alive: Signal[] = [];
+    for (const s of signals.current) {
+      s.t += (dt * s.speed) / Math.max(0.8, axons[s.axon].length);
+      if (s.t < 1) {
+        alive.push(s);
+        continue;
+      }
+      const end = s.forward ? axons[s.axon].to : axons[s.axon].from;
+      glow.current.set(end, now + 450);
+      if (busy && Math.random() < 0.75) fire(end, s.axon);
+    }
+    signals.current = alive;
+    for (let i = 0; i < MAX_SIGNALS; i++) {
+      const s = alive[i];
+      if (s) {
+        const curve = axons[s.axon].points,
+          f = (s.forward ? s.t : 1 - s.t) * (curve.length - 1),
+          k = Math.min(curve.length - 2, Math.floor(f));
+        dummy.position.lerpVectors(curve[k], curve[k + 1], f - k);
+        dummy.scale.setScalar(1);
+      } else dummy.scale.setScalar(0);
+      dummy.updateMatrix();
+      sparks.current.setMatrixAt(i, dummy.matrix);
+    }
+    sparks.current.instanceMatrix.needsUpdate = true;
+    neurons.forEach((n, i) => {
+      const m = cores.current[i];
+      if (!m) return;
+      const lit = (glow.current.get(n.tile) || 0) > now;
+      m.emissiveIntensity = lit
+        ? 3.2
+        : 0.55 + 0.25 * Math.sin(clock.elapsedTime * 1.7 + i);
+    });
+  });
+  return (
+    <group>
+      {axons.map((a, i) => (
+        <mesh key={i} geometry={geometries[i]}>
+          <meshStandardMaterial
+            color="#5fb6ff"
+            emissive="#3a8fe0"
+            emissiveIntensity={0.7}
+            transparent
+            opacity={0.75}
+          />
+        </mesh>
+      ))}
+      <instancedMesh
+        ref={sparks}
+        args={[undefined, undefined, MAX_SIGNALS]}
+        frustumCulled={false}
+      >
+        <sphereGeometry args={[0.075, 8, 6]} />
+        <meshBasicMaterial color="#dff3ff" />
+      </instancedMesh>
+      {neurons.map((n, i) => {
+        const tile = factoryTiles[n.tile];
+        return (
+          <group
+            key={n.tile}
+            position={surfaceOf(tile, 0.16)}
+            quaternion={orientationOf(tile)}
+            onPointerOver={() =>
+              useTown.setState({ hover: `Neuron · ${n.name}` })
+            }
+            onPointerOut={() => useTown.setState({ hover: null })}
+          >
+            <mesh position={[0, 0.12, 0]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.13, 0.17, 0.24, 8]} />
+              <meshStandardMaterial color="#2b3038" roughness={0.6} />
+            </mesh>
+            <mesh position={[0, 0.42, 0]}>
+              <icosahedronGeometry args={[0.17, 1]} />
+              <meshStandardMaterial
+                ref={(m) => {
+                  cores.current[i] = m;
+                }}
+                color={n.color}
+                emissive={n.color}
+                emissiveIntensity={0.6}
+                roughness={0.3}
+              />
+            </mesh>
+            <mesh position={[0, 0.42, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.26, 0.014, 6, 24]} />
+              <meshStandardMaterial
+                color="#9fd6ff"
+                emissive="#4fb3ff"
+                emissiveIntensity={0.8}
+              />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }

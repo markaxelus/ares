@@ -2,6 +2,20 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, globe camera and a neural factory
+
+- Camera written from scratch after feedback that the previous one felt stuck. The anchor
+  stays on the surface: left drag slides the planet under the cursor, right drag or Shift
+  orbits, the wheel zooms toward the cursor and crosses to the other planet, arrows and WASD
+  pan, Q E turn, R F tilt, plus and minus zoom. It goes down to 0.7 units and almost to the
+  horizon. A drag never counts as a click. The camera-controls dependency is gone.
+- The belt follows an exact circle through the intake with evenly spaced pieces, so it is one
+  clean loop instead of a zigzag over tile centres.
+- The factory is a neural network: twelve named neurons on pedestals joined by axons, signals
+  firing all the time and cascading from the intake on every download; twelve named stations
+  beside the belt in processing order; a core district with the crane; a robot yard by the
+  gate; memory domes on the pentagons; every piece labelled on hover. Random scatter removed.
+
 ## 2026-09-27, the factory, the space tunnel and a camera that lands on tiles
 
 - Camera rebuilt on camera-controls. Clicking a tile on either planet lands there: the tile
