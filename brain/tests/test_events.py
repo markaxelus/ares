@@ -135,6 +135,28 @@ class IntegrationTest(unittest.TestCase):
                             self.assertEqual(json.loads(line[6:])['ids'],['fixture']);break
             finally:
                 server.stop_event.set();server.shutdown();server.server_close();time.sleep(.2)
+    def test_http_conditional_get_is_not_a_read(self):
+        doc=b.load(); b.add_note(doc,'Fixture'); b.save(doc)
+        server=b.ThreadingHTTPServer(('127.0.0.1',0),b.Handler)
+        server.stop_event=threading.Event()
+        threading.Thread(target=server.serve_forever,daemon=True).start()
+        url=f'http://127.0.0.1:{server.server_port}/api/brain'
+        reads=lambda:[r for r in self.records() if r['kind']=='mcp_read' and r['source']=='http:brain']
+        try:
+            before=len(reads())
+            with urllib.request.urlopen(url) as response:
+                rev=response.headers['ETag'];self.assertEqual(json.loads(response.read())['rev'],rev)
+            self.assertEqual(len(reads()),before+1)
+            request=urllib.request.Request(url,headers={'If-None-Match':rev})
+            with self.assertRaises(urllib.error.HTTPError) as error:urllib.request.urlopen(request)
+            self.assertEqual(error.exception.code,304)
+            self.assertEqual(error.exception.headers['ETag'],rev)
+            self.assertEqual(len(reads()),before+1)
+            request=urllib.request.Request(url,headers={'If-None-Match':'stale'})
+            with urllib.request.urlopen(request) as response:self.assertEqual(response.status,200)
+            self.assertEqual(len(reads()),before+2)
+        finally:
+            server.stop_event.set();server.shutdown();server.server_close();time.sleep(.2)
 
 if __name__ == '__main__': unittest.main()
 

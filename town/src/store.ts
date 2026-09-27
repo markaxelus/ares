@@ -1,4 +1,4 @@
-// Shared town state, brain polling with SSE reconnects, and placement saves.
+// Shared town state, brain refreshes driven by the event stream, and placement saves.
 import { create } from "zustand";
 import type { PlanetName } from "./planet";
 import type { Brain, BrainEvent } from "./types";
@@ -73,14 +73,21 @@ export const useTown = create<State>((set) => ({
   set,
 }));
 let request: Promise<void> | null = null;
+/** Conditional fetch: when the revision still matches, the server answers 304 and logs no read. */
 export function refreshBrain() {
   if (request) return request;
   request = (async () => {
     try {
-      const r = await fetch("/api/brain");
-      if (!r.ok) throw new Error(`Brain returned ${r.status}`);
-      const { doc, rev } = await r.json();
-      if (rev !== useTown.getState().rev) useTown.setState({ brain: doc, rev });
+      const rev = useTown.getState().rev;
+      const r = await fetch("/api/brain", {
+        headers: rev ? { "If-None-Match": rev } : {},
+      });
+      if (r.status !== 304) {
+        if (!r.ok) throw new Error(`Brain returned ${r.status}`);
+        const { doc, rev: next } = await r.json();
+        if (next !== useTown.getState().rev)
+          useTown.setState({ brain: doc, rev: next });
+      }
       useTown.setState({ error: "" });
     } catch (e) {
       useTown.setState({ error: String(e) });
@@ -90,14 +97,27 @@ export function refreshBrain() {
   })();
   return request;
 }
+/**
+ * The event stream is the change signal: every record, a reconnect and a tab
+ * coming back each trigger a conditional fetch, and a slow conditional poll
+ * covers anything missed. Poll audits and graph UI saves never dispatch robots.
+ */
 export function connectBrain() {
   let stopped = false;
-  void refreshBrain();
-  const timer = setInterval(() => {
-    if (!document.hidden) void refreshBrain();
-  }, 3000);
+  const refresh = () => {
+    if (!stopped) void refreshBrain();
+  };
+  const refreshVisible = () => {
+    if (!document.hidden) refresh();
+  };
+  refresh();
+  const timer = setInterval(refreshVisible, 30000);
+  document.addEventListener("visibilitychange", refreshVisible);
   const source = new EventSource("/api/events");
-  source.onopen = () => useTown.setState({ status: "Connected" });
+  source.onopen = () => {
+    useTown.setState({ status: "Connected" });
+    refresh();
+  };
   source.onerror = () => useTown.setState({ status: "Reconnecting" });
   source.onmessage = (e) => {
     try {
@@ -105,10 +125,10 @@ export function connectBrain() {
         ...JSON.parse(e.data),
         sequence: e.lastEventId,
       } as BrainEvent;
-      // Poll reads are audited, but only agent reads call Scout into action.
-      if (event.source === "http:brain") return;
-      useTown.setState((s) => ({ events: [...s.events.slice(-511), event] }));
-      if (!stopped) void refreshBrain();
+      if (event.kind === "mcp_read" && event.source === "http:brain") return;
+      if (event.source !== "http:brain")
+        useTown.setState((s) => ({ events: [...s.events.slice(-511), event] }));
+      refresh();
     } catch {
       /* A partially written or unrelated record must not close the stream. */
     }
@@ -117,6 +137,7 @@ export function connectBrain() {
     stopped = true;
     source.close();
     clearInterval(timer);
+    document.removeEventListener("visibilitychange", refreshVisible);
   };
 }
 export async function moveBuilding(id: string, tile: number) {

@@ -2,6 +2,20 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, an idle town no longer floods the event log
+
+- The town polled the brain every three seconds and every poll was logged as a read carrying
+  all 76 place ids, so `brain/events.jsonl` had grown to 5.7 MB in which 4,548 of 4,560 records
+  were poll audits, and every event-stream client received each one. `GET /api/brain` now
+  answers with an `ETag`; a request whose `If-None-Match` matches gets 304 and is not logged,
+  since no knowledge moved. The town refreshes from the event stream instead: every record, a
+  reconnect and a tab coming back trigger a conditional fetch, and a conditional poll every
+  30 s covers anything missed. Graph UI saves refresh the town without dispatching robots, as
+  before. Existing log records were left as they are.
+- Frame rate at full resolution measured in the built-in browser at emulated 1920 by 1080 and
+  2560 by 1440 viewports: 82 to 83 fps in the system, knowledge planet and factory views alike,
+  which is the pane's refresh cap rather than the GPU. Recorded in `README.md`.
+
 ## 2026-09-27, globe camera and a neural factory
 
 - Camera written from scratch after feedback that the previous one felt stuck. The anchor
