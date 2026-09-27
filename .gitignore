@@ -9,3 +9,6 @@ __pycache__/
 
 # transcripts and notes dropped for ingestion stay local
 brain/inbox/
+
+# downloaded asset packs; curated models live in town/public/models
+town/assets/raw/
