@@ -404,3 +404,61 @@ dd {
   font-size: 11px;
   margin: 18px 0 0;
 }
+
+nav em {
+  font-style: normal;
+  font-size: 11px;
+  margin-left: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #3b4b66;
+}
+.quests h2 {
+  margin-bottom: 10px;
+}
+.bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #263248;
+  overflow: hidden;
+}
+.bar span {
+  display: block;
+  height: 100%;
+  background: #eacb8d;
+  border-radius: inherit;
+  transition: width 0.6s ease-out;
+}
+.meter {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #91a7c1;
+  margin: 8px 0 0;
+}
+.toasts {
+  position: absolute;
+  left: 36px;
+  bottom: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.toast {
+  padding: 10px 14px;
+  background: #1c2a20;
+  border: 1px solid #4f8a5c;
+  border-radius: 9px;
+  font-size: 13px;
+  animation: rise 0.4s ease-out;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

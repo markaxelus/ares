@@ -1,4 +1,4 @@
-// Town app shell: canvas, header, explore panel, details panel, search and footer.
+// Town app shell: canvas, header, explore and quest panels, details, search and footer.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { World } from "./Scene";
@@ -8,15 +8,20 @@ import { Tunnel } from "./Tunnel";
 import { Workers } from "./Robots";
 import { useTown, connectBrain, type View } from "./store";
 import { breadcrumb, layoutBrain } from "./layout";
+import { ASKS, DONE, brief, progress, streakLine, type Progress } from "./game";
 import { factoryTiles, tiles } from "./planet";
 import type { BrainNode } from "./types";
 import "./style.css";
 const tileCount = (tiles.length + factoryTiles.length).toLocaleString("en-US");
+const QUESTS_SHOWN = 12;
 function App() {
   const [search, setSearch] = useState(false),
     [query, setQuery] = useState(""),
     [allLinks, setAllLinks] = useState(false),
-    [places, setPlaces] = useState(false);
+    [places, setPlaces] = useState(false),
+    [quests, setQuests] = useState(false),
+    [allQuests, setAllQuests] = useState(false),
+    [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const {
     brain,
     fps,
@@ -30,10 +35,39 @@ function App() {
     loadMs,
   } = useTown();
   const input = useRef<HTMLInputElement>(null);
-  const open = useRef({ search, places });
-  open.current = { search, places };
+  const open = useRef({ search, places, quests });
+  open.current = { search, places, quests };
   const layout = useMemo(() => (brain ? layoutBrain(brain) : null), [brain]);
+  const game = useMemo(() => (brain ? progress(brain) : null), [brain]);
+  const previous = useRef<Progress | null>(null);
   useEffect(connectBrain, []);
+  // Ares briefs you on the first load; afterwards every tended quest is celebrated.
+  useEffect(() => {
+    if (!game) return;
+    const before = previous.current;
+    previous.current = game;
+    if (!before) {
+      useTown.setState({ activity: brief(game) });
+      return;
+    }
+    const lines = before.quests
+      .filter(
+        (q) => !game.quests.some((n) => n.id === q.id && n.kind === q.kind),
+      )
+      .slice(0, 3)
+      .map((q) => `${DONE[q.kind]}: ${q.title}`);
+    if (game.level > before.level)
+      lines.push(`Level ${game.level}. The planet grew.`);
+    if (game.streak > before.streak && game.streak > 1)
+      lines.push(`${game.streak}-day streak`);
+    if (!lines.length) return;
+    const ids = lines.map(() => Math.random());
+    setToasts((t) => [...t, ...lines.map((text, i) => ({ id: ids[i], text }))]);
+    setTimeout(
+      () => setToasts((t) => t.filter((x) => !ids.includes(x.id))),
+      7000,
+    );
+  }, [game]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -43,9 +77,10 @@ function App() {
       // Escape steps back: close what is open, then the place, then the planet.
       if (e.key === "Escape") {
         const s = useTown.getState();
-        if (open.current.search || open.current.places) {
+        if (open.current.search || open.current.places || open.current.quests) {
           setSearch(false);
           setPlaces(false);
+          setQuests(false);
         } else if (s.selected) useTown.setState({ selected: null });
         else if (s.focus) s.look({ focus: null, view: s.focus.planet });
         else s.look({ view: "system" });
@@ -65,11 +100,17 @@ function App() {
         .look({ selected: n.id, focus: { planet: "brain", tile } });
     setSearch(false);
     setPlaces(false);
+    setQuests(false);
   };
   const go = (view: View) => {
     useTown.getState().look({ view, focus: null, selected: null });
     setPlaces(false);
   };
+  const shownQuests = game
+    ? allQuests
+      ? game.quests
+      : game.quests.slice(0, QUESTS_SHOWN)
+    : [];
   const node = brain?.nodes.find((n) => n.id === selected),
     hits =
       brain?.nodes
@@ -96,11 +137,80 @@ function App() {
           >
             Find a place <kbd>Ctrl K</kbd>
           </button>
-          <button aria-expanded={places} onClick={() => setPlaces(!places)}>
+          <button
+            aria-expanded={quests}
+            onClick={() => {
+              setQuests(!quests);
+              setPlaces(false);
+            }}
+          >
+            Quests{game && <em>{game.quests.length}</em>}
+          </button>
+          <button
+            aria-expanded={places}
+            onClick={() => {
+              setPlaces(!places);
+              setQuests(false);
+            }}
+          >
             Explore
           </button>
         </nav>
       </header>
+      {quests && game && brain && (
+        <section className="places quests" aria-label="Quests">
+          <h2>Level {game.level}</h2>
+          <div
+            className="bar"
+            role="progressbar"
+            aria-valuemin={game.levelStart}
+            aria-valuemax={game.levelEnd}
+            aria-valuenow={game.points}
+          >
+            <span
+              style={{
+                width: `${Math.min(
+                  100,
+                  ((game.points - game.levelStart) /
+                    (game.levelEnd - game.levelStart)) *
+                    100,
+                )}%`,
+              }}
+            />
+          </div>
+          <p className="meter">
+            {game.points} points · {game.levelEnd - game.points} to level{" "}
+            {game.level + 1}
+          </p>
+          <p className="meter">{streakLine(game)}</p>
+          <h3>Quests</h3>
+          {shownQuests.map((q) => (
+            <button
+              key={`${q.kind}:${q.id}`}
+              onClick={() => {
+                const n = brain.nodes.find((x) => x.id === q.id);
+                if (n) select(n);
+              }}
+            >
+              {q.title}
+              <span>{ASKS[q.kind]}</span>
+            </button>
+          ))}
+          {game.quests.length > shownQuests.length && (
+            <button onClick={() => setAllQuests(true)}>
+              And {game.quests.length - shownQuests.length} more
+            </button>
+          )}
+          {!game.quests.length && (
+            <p className="meter">Nothing to tend. Well kept.</p>
+          )}
+          <p className="meter">
+            Points come from how mature each place is: details written,
+            confidence high, linked to others. Tend a place in the graph or the
+            CLI and watch it grow here.
+          </p>
+        </section>
+      )}
       {places && (
         <section className="places">
           <h2>Your system</h2>
@@ -262,6 +372,15 @@ function App() {
         </div>
       )}
       {hover && !search && <div className="hover-label">{hover}</div>}
+      {toasts.length > 0 && (
+        <div className="toasts" aria-live="polite">
+          {toasts.map((t) => (
+            <div key={t.id} className="toast">
+              {t.text}
+            </div>
+          ))}
+        </div>
+      )}
       {error && (
         <div className="error" role="alert">
           {error}
@@ -273,7 +392,13 @@ function App() {
       <footer>
         <span>
           {status === "Connected"
-            ? `${brain?.nodes.length || 0} places`
+            ? `${brain?.nodes.length || 0} places${
+                game
+                  ? ` · Level ${game.level}${
+                      game.streak ? ` · ${game.streak}-day streak` : ""
+                    }`
+                  : ""
+              }`
             : status}
           <span className="hint">
             {" "}

@@ -2,6 +2,18 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, the play loop: level, streak and quests
+
+- A Quests panel in the header: level and points bar, streak line, and one quest per place that
+  needs tending (inbox note, open question, low confidence, no links, stale for 90 days, no
+  details), most pressing first, twelve shown with the rest a click away. Clicking a quest
+  flies to the place.
+- Points come from maturity (1, 3, 6 per place); levels begin at 0, 20, 60, 120, 200 and so on.
+  The streak counts consecutive tended days, alive through a quiet today.
+- Ares briefs you on the activity line when the town opens. Tended quests, a new level and a
+  longer streak are celebrated in toasts as soon as the brain refreshes.
+- `game.ts` holds the pure rules with tests; `README.md` has a Tending the planet section.
+
 ## 2026-09-27, the neural web is the brain's own regions
 
 - The twelve invented neurons (Attention, Recall and so on) and their nearest-neighbour axons

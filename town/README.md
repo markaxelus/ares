@@ -25,6 +25,15 @@ Node 22.18+ or 23.6+ supports the native TypeScript config and test runner. Pyth
 - Rails appear for the selected building by default. Hover one for its relation.
 - The footer measures FPS from the R3F frame loop. Explore also shows the initial model-ready time. These are measurements on your browser, not claimed hardware benchmarks.
 
+## Tending the planet
+
+The town is a game about keeping your brain alive, and every number in it is derived from `brain.json` when it loads. Nothing is stored anywhere else.
+
+- **Points and level.** Each place scores by maturity: 1 for a sketch, 3 once it has details, 6 once it also has high confidence and a link. Levels begin at 0, 20, 60, 120, 200, 300 points and so on (10 × level × (level − 1)). The Quests panel shows the bar to the next level; the footer shows the level.
+- **Streak.** A day counts as tended when any place was created or updated that day. The streak runs back from today, or from yesterday while today is still quiet; a missed day breaks it, and the panel says when you last tended.
+- **Quests.** One per place, the most pressing kind first: a note waiting in the Inbox (sort it), an open question (answer it), low confidence (confirm it or drop it), no links and no children (link it to something), untouched for 90 days (still true? touch it), no details yet (write them). The root and the Inbox itself are never quests. Click a quest to fly to the place; do the work in the graph or the CLI, and the fog, scaffolding or moss goes away on the next refresh.
+- **Ares briefs you.** When the town opens, the activity line carries Ares's summary: level, streak, how many things to tend and where to start. Every quest that disappears after a change is celebrated in a toast, as is a new level or a longer streak.
+
 ## Layout and rendering
 
 Two Goldberg planets share one scene. The knowledge planet (radius 9, 1,002 tiles) sits at x = -14 and the factory (radius 5.5, 362 tiles) at x = 17; each is drawn inside its own group, so everything on a planet works in that planet's local frame and only the camera, the tunnel and the commuting robots think in world space.
