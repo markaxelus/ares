@@ -2,6 +2,21 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, full resolution by default, shadows, planet dressing
+
+- Full resolution is the default look. The canvas renders at its native size with 4x MSAA
+  instead of the half-size pixel pass with nearest-neighbour upscaling that read as blurry.
+  Fine pixels and Classic pixels stay as opt-in looks in Explore; the Sharp option is gone.
+  The chosen look is remembered in localStorage.
+- The sun casts shadows from a 4096 map. Plates, buildings, dressing and walking robots cast
+  and receive; the station, satellite, moons and their riders do not, so nothing in orbit
+  paints squares on the ocean.
+- Placed the curated models that had no use yet: pentagon mountains, biome rocks, the
+  OceanAID dock (aligned to its plate), the Ares dome, base, radar and rover, planks and a
+  small crate at the Inbox pad, three moons in the sky, the shuttle as the courier pod, and a
+  dog on the town hall land.
+- `README.md` records the browser check and what the built-in browser pane cannot measure.
+
 ## 2026-09-26, Quaternius packs added by hand
 
 - Ultimate Space Kit, Animated Mech Pack and Ultimate Fantasy RTS were downloaded manually
