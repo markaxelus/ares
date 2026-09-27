@@ -20,6 +20,7 @@ type State = {
   activity: string;
   builds: Record<string, number>;
   illuminated: Record<string, number>;
+  tended: Record<string, number>;
   pixelSize: number;
   fps: number;
   loadMs: number;
@@ -46,6 +47,7 @@ export const useTown = create<State>((set) => ({
   activity: "Robots are charging at the factory",
   builds: {},
   illuminated: {},
+  tended: {},
   pixelSize: savedPixelSize(),
   fps: 0,
   loadMs: 0,

@@ -50,12 +50,19 @@ function App() {
       useTown.setState({ activity: brief(game) });
       return;
     }
-    const lines = before.quests
-      .filter(
-        (q) => !game.quests.some((n) => n.id === q.id && n.kind === q.kind),
-      )
-      .slice(0, 3)
-      .map((q) => `${DONE[q.kind]}: ${q.title}`);
+    const done = before.quests.filter(
+      (q) => !game.quests.some((n) => n.id === q.id && n.kind === q.kind),
+    );
+    if (done.length) {
+      const until = performance.now() + 4000;
+      useTown.setState((s) => ({
+        tended: {
+          ...s.tended,
+          ...Object.fromEntries(done.map((q) => [q.id, until])),
+        },
+      }));
+    }
+    const lines = done.slice(0, 3).map((q) => `${DONE[q.kind]}: ${q.title}`);
     if (game.level > before.level)
       lines.push(`Level ${game.level}. The planet grew.`);
     if (game.streak > before.streak && game.streak > 1)

@@ -1,6 +1,8 @@
 // Brain to planet: plates, building, rail and dressing placements and per-node
 // details, all inside the knowledge planet's group.
-import { Suspense, useCallback, useMemo } from "react";
+import { Suspense, useCallback, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import type { Group } from "three";
 import { AssetBatches, assets, type Placement } from "./Assets";
 import { biomeColors, Plates, type PlateStyle } from "./Scene";
 import {
@@ -50,12 +52,92 @@ export function buildingPlacements(brain: Brain, layout: Layout): Placement[] {
     ];
   });
 }
-function Details({ node, tile }: { node: BrainNode; tile: number }) {
+/** A short burst of rising sparks over a place whose quest was just done. */
+function Burst({ id }: { id: string }) {
+  const until = useTown((s) => s.tended[id] || 0);
+  const ref = useRef<Group>(null!);
+  useFrame(() => {
+    const g = ref.current;
+    if (!g) return;
+    const left = until - performance.now();
+    if (left <= 0) {
+      g.visible = false;
+      return;
+    }
+    const t = 1 - left / 4000;
+    g.visible = true;
+    g.children.forEach((c, i) => {
+      const a = (i / g.children.length) * Math.PI * 2,
+        r = 0.15 + t * 0.45;
+      c.position.set(
+        Math.cos(a) * r,
+        0.2 + t * 1.4 + Math.sin(t * 9 + i) * 0.05,
+        Math.sin(a) * r,
+      );
+      c.scale.setScalar(Math.max(0.001, 1 - t));
+    });
+  });
+  if (until <= performance.now()) return null;
+  return (
+    <group ref={ref}>
+      {Array.from({ length: 10 }, (_, i) => (
+        <mesh key={i}>
+          <sphereGeometry args={[0.045, 6, 5]} />
+          <meshStandardMaterial
+            color="#fff1b8"
+            emissive="#ffd25e"
+            emissiveIntensity={2.2}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+/**
+ * Per-place markers: selection ring, pinned flag, scaffolding for low
+ * confidence, moss when stale, fog for a question, an empty signpost when the
+ * place has no links, a lamp, and a burst when its quest gets done.
+ */
+function Details({
+  node,
+  tile,
+  orphan,
+}: {
+  node: BrainNode;
+  tile: number;
+  orphan: boolean;
+}) {
   const old =
     Date.now() - Date.parse(node.updated || node.created || "") > 90 * 86400000;
   const selected = useTown((s) => s.selected === node.id);
   return (
     <group position={surface(tile, 0.2)} quaternion={orientation(tile)}>
+      <Burst id={node.id} />
+      {orphan && (
+        <group
+          position={[-0.3, 0, -0.22]}
+          onPointerOver={() =>
+            useTown.setState({ hover: "No links yet · link it to something" })
+          }
+          onPointerOut={() => useTown.setState({ hover: null })}
+        >
+          <mesh position={[0, 0.3, 0]} castShadow>
+            <cylinderGeometry args={[0.014, 0.014, 0.6, 5]} />
+            <meshStandardMaterial color="#b9a88a" />
+          </mesh>
+          {[0.5, 0.38].map((y, i) => (
+            <mesh
+              key={y}
+              position={[i ? -0.07 : 0.07, y, 0]}
+              rotation={[0, i ? 0.5 : -0.5, 0]}
+              castShadow
+            >
+              <boxGeometry args={[0.2, 0.07, 0.02]} />
+              <meshStandardMaterial color="#d9c9a5" />
+            </mesh>
+          ))}
+        </group>
+      )}
       {selected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
           <ringGeometry args={[0.43, 0.47, 32]} />
@@ -120,8 +202,33 @@ function Details({ node, tile }: { node: BrainNode; tile: number }) {
     </group>
   );
 }
-/** One banner per level around the town hall, so growth shows in the world. */
-function Banners({ tile, level }: { tile: number; level: number }) {
+/**
+ * The town hall yard: one banner per level, and a brazier that burns while
+ * the streak is alive and sits cold when it is broken.
+ */
+function Hall({
+  tile,
+  level,
+  streak,
+}: {
+  tile: number;
+  level: number;
+  streak: number;
+}) {
+  const flame = useRef<Group>(null!);
+  useFrame(({ clock }) => {
+    if (!flame.current) return;
+    const t = clock.elapsedTime;
+    flame.current.scale.set(
+      1 + Math.sin(t * 13) * 0.12,
+      1 + Math.sin(t * 17) * 0.2,
+      1 + Math.cos(t * 11) * 0.12,
+    );
+    flame.current.rotation.y = t * 2;
+  });
+  const fire = streak
+    ? `${streak}-day streak · the fire burns while you keep tending`
+    : "Streak broken · tend a place today to relight the fire";
   const banners = Array.from({ length: level }, (_, i) => {
     const ring = Math.floor(i / 12),
       angle = (i % 12) * (Math.PI / 6) + ring * 0.26,
@@ -135,26 +242,69 @@ function Banners({ tile, level }: { tile: number; level: number }) {
     };
   });
   return (
-    <group
-      position={surface(tile, 0.2)}
-      quaternion={orientation(tile)}
-      onPointerOver={() =>
-        useTown.setState({ hover: `Level ${level} · one banner per level` })
-      }
-      onPointerOut={() => useTown.setState({ hover: null })}
-    >
-      {banners.map((b) => (
-        <group key={b.key} position={[b.x, 0, b.z]} rotation={[0, -b.angle, 0]}>
-          <mesh position={[0, 0.3, 0]} castShadow>
-            <cylinderGeometry args={[0.012, 0.012, 0.6, 5]} />
-            <meshStandardMaterial color="#e5dfc7" />
+    <group position={surface(tile, 0.2)} quaternion={orientation(tile)}>
+      <group
+        onPointerOver={() =>
+          useTown.setState({ hover: `Level ${level} · one banner per level` })
+        }
+        onPointerOut={() => useTown.setState({ hover: null })}
+      >
+        {banners.map((b) => (
+          <group
+            key={b.key}
+            position={[b.x, 0, b.z]}
+            rotation={[0, -b.angle, 0]}
+          >
+            <mesh position={[0, 0.3, 0]} castShadow>
+              <cylinderGeometry args={[0.012, 0.012, 0.6, 5]} />
+              <meshStandardMaterial color="#e5dfc7" />
+            </mesh>
+            <mesh position={[0.08, 0.5, 0]} castShadow>
+              <boxGeometry args={[0.14, 0.11, 0.02]} />
+              <meshStandardMaterial color={b.color} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+      <group
+        position={[0.13, 0, -0.48]}
+        onPointerOver={() => useTown.setState({ hover: fire })}
+        onPointerOut={() => useTown.setState({ hover: null })}
+      >
+        <mesh position={[0, 0.08, 0]} castShadow>
+          <cylinderGeometry args={[0.1, 0.06, 0.16, 8]} />
+          <meshStandardMaterial color="#4a4038" />
+        </mesh>
+        {streak > 0 ? (
+          <group ref={flame} position={[0, 0.17, 0]}>
+            <mesh position={[0, 0.12, 0]}>
+              <coneGeometry args={[0.08, 0.28, 6]} />
+              <meshStandardMaterial
+                color="#ffb347"
+                emissive="#ff7a1a"
+                emissiveIntensity={2.4}
+              />
+            </mesh>
+            <mesh position={[0, 0.08, 0]}>
+              <coneGeometry args={[0.045, 0.16, 5]} />
+              <meshStandardMaterial
+                color="#fff2b0"
+                emissive="#ffd86b"
+                emissiveIntensity={3}
+              />
+            </mesh>
+          </group>
+        ) : (
+          <mesh position={[0, 0.16, 0]}>
+            <sphereGeometry args={[0.05, 6, 5]} />
+            <meshStandardMaterial
+              color="#3a2f2a"
+              emissive="#5a2a14"
+              emissiveIntensity={0.35}
+            />
           </mesh>
-          <mesh position={[0.08, 0.5, 0]} castShadow>
-            <boxGeometry args={[0.14, 0.11, 0.02]} />
-            <meshStandardMaterial color={b.color} />
-          </mesh>
-        </group>
-      ))}
+        )}
+      </group>
     </group>
   );
 }
@@ -221,7 +371,12 @@ export function BrainWorld({
     () => (brain && layout ? buildingPlacements(brain, layout) : []),
     [brain, layout],
   );
-  const level = useMemo(() => (brain ? progress(brain).level : 0), [brain]);
+  const game = useMemo(() => (brain ? progress(brain) : null), [brain]);
+  const orphans = useMemo(
+    () =>
+      new Set(game?.quests.filter((q) => q.kind === "orphan").map((q) => q.id)),
+    [game],
+  );
   const hall =
     brain && layout
       ? layout.positions.get(
@@ -375,11 +530,16 @@ export function BrainWorld({
           {brain.nodes.map((n) => {
             const tile = layout.positions.get(n.id);
             return tile !== undefined && tile >= 0 ? (
-              <Details key={n.id} node={n} tile={tile} />
+              <Details
+                key={n.id}
+                node={n}
+                tile={tile}
+                orphan={orphans.has(n.id)}
+              />
             ) : null;
           })}
-          {hall !== undefined && hall >= 0 && (
-            <Banners tile={hall} level={level} />
+          {hall !== undefined && hall >= 0 && game && (
+            <Hall tile={hall} level={game.level} streak={game.streak} />
           )}
           <Pet layout={layout} />
         </>

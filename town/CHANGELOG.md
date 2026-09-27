@@ -2,6 +2,15 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, the streak and tended quests show in the world
+
+- A brazier in the town hall yard burns and flickers while the streak is alive and sits as cold
+  embers when it is broken; hover it for the streak.
+- Every place with no links carries an empty signpost, the world's version of the "link it to
+  something" quest.
+- When a quest gets done, ten sparks rise over the building for four seconds, alongside the
+  toast. Tended ids live only in the session store.
+
 ## 2026-09-27, banners for the level and robots with character
 
 - The town hall flies one banner per level around its tile, alternating red and gold, with

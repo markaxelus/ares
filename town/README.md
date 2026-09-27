@@ -33,6 +33,7 @@ The town is a game about keeping your brain alive, and every number in it is der
 - **Streak.** A day counts as tended when any place was created or updated that day. The streak runs back from today, or from yesterday while today is still quiet; a missed day breaks it, and the panel says when you last tended.
 - **Quests.** One per place, the most pressing kind first: a note waiting in the Inbox (sort it), an open question (answer it), low confidence (confirm it or drop it), no links and no children (link it to something), untouched for 90 days (still true? touch it), no details yet (write them). The root and the Inbox itself are never quests. Click a quest to fly to the place; do the work in the graph or the CLI, and the fog, scaffolding or moss goes away on the next refresh.
 - **Ares briefs you.** When the town opens, the activity line carries Ares's summary: level, streak, how many things to tend and where to start. Every quest that disappears after a change is celebrated in a toast, as is a new level or a longer streak.
+- **It shows in the world.** The town hall flies one banner per level and keeps a brazier that burns while the streak is alive and sits cold when it is broken. A place with no links carries an empty signpost next to the existing fog, scaffolding and moss. When a quest gets done, sparks rise over the building for a few seconds.
 
 ## Layout and rendering
 
