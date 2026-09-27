@@ -2,6 +2,19 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, banners for the level and robots with character
+
+- The town hall flies one banner per level around its tile, alternating red and gold, with
+  a hover label; a second ring starts at level thirteen.
+- Robots rebuilt from primitives with more character: capsule torso with a heart light in the
+  role colour, boxy head with a visor, blinking eyes, a pulsing antenna, ear lights, hinged
+  arms with hands and legs with feet. Role gear: Courier jetpack with glowing nozzles, Builder
+  hard hat, tool belt and wrench, Archivist glasses and satchel, Scout dish and goggles, Ares
+  crown and cape. Walking swings limbs and bobs the body, idle robots look around, carrying
+  brings the arms forward.
+- Switching planets from Explore no longer arrives with the tunnel across the view: when the
+  camera would come in from the tunnel side it comes in from above instead.
+
 ## 2026-09-27, the play loop: level, streak and quests
 
 - A Quests panel in the header: level and points bar, streak line, and one quest per place that

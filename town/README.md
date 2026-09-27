@@ -65,7 +65,9 @@ Courier, Builder and Archivist live at the factory. Between jobs each stands on 
 - Scout is a satellite over the knowledge planet; it sweeps and illuminates the IDs returned by MCP reads.
 - Ares rides the station that circles the factory.
 
-The activity line at the bottom left narrates the current leg. All five robots share a primitive body with role accessories. Walk, idle and carry motion is generated in code. Animation state is transient. The manifest's old robot GLBs remain available but are not required by this version.
+The activity line at the bottom left narrates the current leg. All five robots share a body built from primitives: a capsule torso with a heart light in the role colour, a boxy head with a visor, two eyes that blink and an antenna that pulses, hinged arms and legs with feet. Gear tells them apart: Courier wears a jetpack with glowing nozzles, Builder a hard hat, tool belt and wrench, Archivist round glasses and a satchel, Scout a dish and goggles, Ares a crown and a cape. Walking swings the legs and arms and bobs the body, idle robots look around, and carrying brings both arms forward. Animation state is transient. The manifest's old robot GLBs remain available but are not required by this version.
+
+The town hall flies one banner per level, so the planet's growth is visible from orbit.
 
 ## Validation
 

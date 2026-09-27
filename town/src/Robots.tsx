@@ -3,7 +3,13 @@
 // factory; the scout circles the planet; a dog wanders the town hall land.
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Group, Mesh, QuadraticBezierCurve3, Vector3 } from "three";
+import {
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  QuadraticBezierCurve3,
+  Vector3,
+} from "three";
 import { Asset } from "./Assets";
 import { eventJobs, tilePath, type Job, type Role } from "./behavior";
 import { factoryLayout, type WorkerRole } from "./Factory";
@@ -42,7 +48,12 @@ const labels: Record<WorkerRole, string> = {
   builder: "Builder",
   archivist: "Archivist",
 };
-/** Primitive robot body with role accessories. Riders in orbit pass shadow false. */
+/**
+ * Robot body from primitives: capsule torso with a heart light, a visor with
+ * two blinking eyes, a pulsing antenna, hinged arms and legs, and gear per
+ * role. Riders in orbit pass shadow false.
+ * @param motion per-frame walk and carry flags from the worker, if any
+ */
 export function Robot({
   role,
   walking = false,
@@ -57,8 +68,23 @@ export function Robot({
   motion?: React.RefObject<{ walk: boolean; carry: boolean }>;
 }) {
   const rig = useRef<Group>(null!),
-    left = useRef<Group>(null!),
-    right = useRef<Group>(null!);
+    head = useRef<Group>(null!),
+    leftLeg = useRef<Group>(null!),
+    rightLeg = useRef<Group>(null!),
+    leftArm = useRef<Group>(null!),
+    rightArm = useRef<Group>(null!),
+    tip = useRef<MeshStandardMaterial>(null!);
+  const color = colors[role];
+  const eyes = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: "#bff4ff",
+        emissive: "#7fe0ff",
+        emissiveIntensity: 1.4,
+      }),
+    [],
+  );
+  useEffect(() => () => eyes.dispose(), [eyes]);
   useEffect(() => {
     rig.current.traverse((o) => {
       o.castShadow = shadow;
@@ -66,113 +92,203 @@ export function Robot({
     });
   }, [role, carrying, shadow]);
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    rig.current.position.y = 0.015 * Math.sin(t * 2);
-    left.current.rotation.x =
-      (motion?.current.walk ?? walking) ? Math.sin(t * 11) * 0.55 : 0;
-    right.current.rotation.x = -left.current.rotation.x;
+    const t = clock.elapsedTime,
+      walk = motion?.current.walk ?? walking,
+      carry = motion?.current.carry ?? carrying,
+      swing = walk ? Math.sin(t * 11) : 0;
+    rig.current.position.y = walk
+      ? Math.abs(Math.sin(t * 11)) * 0.02
+      : 0.012 * Math.sin(t * 2);
+    leftLeg.current.rotation.x = swing * 0.6;
+    rightLeg.current.rotation.x = -swing * 0.6;
+    leftArm.current.rotation.x = carry ? -1.25 : -swing * 0.5;
+    rightArm.current.rotation.x = carry ? -1.25 : swing * 0.5;
+    head.current.rotation.y = walk ? 0 : Math.sin(t * 0.7) * 0.35;
+    head.current.rotation.x = carry ? 0.15 : 0;
+    tip.current.emissiveIntensity = Math.sin(t * 5) > 0.6 ? 1.2 : 0.35;
+    eyes.emissiveIntensity = Math.sin(t * 1.3) > 0.97 ? 0.1 : 1.4;
   });
   return (
     <group ref={rig} scale={1.15}>
-      <mesh position={[0, 0.28, 0]}>
-        <boxGeometry args={[0.23, 0.24, 0.16]} />
-        <meshStandardMaterial color={colors[role]} roughness={0.7} />
+      <mesh position={[0, 0.3, 0]}>
+        <capsuleGeometry args={[0.12, 0.12, 4, 10]} />
+        <meshStandardMaterial color={color} roughness={0.65} />
       </mesh>
-      <mesh position={[0, 0.47, 0]}>
-        <sphereGeometry args={[0.14, 10, 8]} />
-        <meshStandardMaterial color="#e4e8e6" />
-      </mesh>
-      <mesh position={[0, 0.48, 0.12]}>
-        <boxGeometry args={[0.18, 0.065, 0.03]} />
+      <mesh position={[0, 0.31, 0.11]}>
+        <boxGeometry args={[0.09, 0.09, 0.03]} />
         <meshStandardMaterial
-          color="#233b50"
-          emissive="#5fbbd3"
-          emissiveIntensity={0.3}
+          color="#1c2a3a"
+          emissive={color}
+          emissiveIntensity={0.9}
         />
       </mesh>
-      <mesh position={[0.04, 0.64, 0]}>
-        <cylinderGeometry args={[0.012, 0.012, 0.12, 5]} />
-        <meshStandardMaterial color="#a8b6bc" />
-      </mesh>
-      <mesh position={[0.04, 0.71, 0]}>
-        <sphereGeometry args={[0.027, 6, 5]} />
-        <meshStandardMaterial
-          color={colors[role]}
-          emissive={colors[role]}
-          emissiveIntensity={0.4}
-        />
-      </mesh>
-      <group ref={left} position={[-0.07, 0.17, 0]}>
-        <mesh position={[0, -0.075, 0]}>
-          <boxGeometry args={[0.065, 0.15, 0.09]} />
-          <meshStandardMaterial color="#b5c3c9" />
+      <group ref={head} position={[0, 0.5, 0]}>
+        <mesh>
+          <boxGeometry args={[0.26, 0.2, 0.22]} />
+          <meshStandardMaterial color="#e4e8e6" roughness={0.5} />
         </mesh>
-      </group>
-      <group ref={right} position={[0.07, 0.17, 0]}>
-        <mesh position={[0, -0.075, 0]}>
-          <boxGeometry args={[0.065, 0.15, 0.09]} />
-          <meshStandardMaterial color="#b5c3c9" />
+        <mesh position={[0, 0.01, 0.105]}>
+          <boxGeometry args={[0.2, 0.09, 0.03]} />
+          <meshStandardMaterial color="#17273a" />
         </mesh>
-      </group>
-      {[-1, 1].map((s) => (
-        <mesh
-          key={s}
-          position={[s * 0.15, 0.26, carrying ? 0.07 : 0]}
-          rotation={[carrying ? -0.8 : 0, 0, s * 0.12]}
-        >
-          <boxGeometry args={[0.05, 0.18, 0.06]} />
-          <meshStandardMaterial color="#b8c5cc" />
-        </mesh>
-      ))}
-      {role === "courier" && (
-        <mesh position={[0, 0.29, -0.14]}>
-          <boxGeometry args={[0.2, 0.25, 0.14]} />
-          <meshStandardMaterial color="#766b61" />
-        </mesh>
-      )}
-      {role === "builder" && (
-        <group position={[0, 0.56, 0]}>
-          <mesh>
-            <sphereGeometry
-              args={[0.15, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]}
-            />
-            <meshStandardMaterial color="#f1c55c" />
-          </mesh>
-          <mesh>
-            <cylinderGeometry args={[0.18, 0.18, 0.03, 10]} />
-            <meshStandardMaterial color="#f1c55c" />
-          </mesh>
-        </group>
-      )}
-      {role === "archivist" &&
-        [-0.06, 0.06].map((x) => (
-          <mesh key={x} position={[x, 0.49, 0.147]}>
-            <torusGeometry args={[0.043, 0.011, 4, 8]} />
-            <meshStandardMaterial color="#a793d0" />
+        {[-0.05, 0.05].map((x) => (
+          <mesh key={x} position={[x, 0.01, 0.125]} material={eyes}>
+            <sphereGeometry args={[0.022, 8, 6]} />
           </mesh>
         ))}
-      {role === "scout" && (
-        <mesh position={[0, 0.61, -0.08]} rotation={[-0.4, 0, 0]}>
-          <sphereGeometry args={[0.12, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color="#85c2cf" side={2} />
-        </mesh>
-      )}
-      {role === "ares" && (
-        <group position={[0, 0.6, 0]}>
-          <mesh>
-            <cylinderGeometry args={[0.14, 0.12, 0.07, 7, 1, true]} />
-            <meshStandardMaterial color="#edd083" />
+        {[-0.14, 0.14].map((x) => (
+          <mesh key={x} position={[x, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.03, 8]} />
+            <meshStandardMaterial color="#8fa0a8" />
           </mesh>
-          {[-0.09, 0, 0.09].map((x) => (
-            <mesh key={x} position={[x, 0.065, 0.07]}>
-              <coneGeometry args={[0.04, 0.12, 4]} />
-              <meshStandardMaterial color="#edd083" />
+        ))}
+        <mesh position={[0.06, 0.16, 0]}>
+          <cylinderGeometry args={[0.01, 0.01, 0.12, 5]} />
+          <meshStandardMaterial color="#a8b6bc" />
+        </mesh>
+        <mesh position={[0.06, 0.23, 0]}>
+          <sphereGeometry args={[0.026, 6, 5]} />
+          <meshStandardMaterial
+            ref={tip}
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.4}
+          />
+        </mesh>
+        {role === "builder" && (
+          <group position={[0, 0.1, 0]}>
+            <mesh position={[0, 0.02, 0]}>
+              <sphereGeometry
+                args={[0.16, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]}
+              />
+              <meshStandardMaterial color="#f1c55c" />
             </mesh>
+            <mesh>
+              <cylinderGeometry args={[0.19, 0.19, 0.03, 10]} />
+              <meshStandardMaterial color="#f1c55c" />
+            </mesh>
+          </group>
+        )}
+        {role === "archivist" &&
+          [-0.05, 0.05].map((x) => (
+            <mesh key={x} position={[x, 0.01, 0.135]}>
+              <torusGeometry args={[0.04, 0.009, 4, 10]} />
+              <meshStandardMaterial color="#a793d0" />
+            </mesh>
+          ))}
+        {role === "scout" && (
+          <>
+            <mesh position={[0, 0.12, -0.04]} rotation={[-0.5, 0, 0]}>
+              <sphereGeometry
+                args={[0.12, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]}
+              />
+              <meshStandardMaterial color="#85c2cf" side={2} />
+            </mesh>
+            <mesh position={[0, 0.06, 0.1]}>
+              <boxGeometry args={[0.22, 0.05, 0.04]} />
+              <meshStandardMaterial color="#3c5a66" />
+            </mesh>
+          </>
+        )}
+        {role === "ares" && (
+          <group position={[0, 0.1, 0]}>
+            <mesh>
+              <cylinderGeometry args={[0.14, 0.12, 0.07, 7, 1, true]} />
+              <meshStandardMaterial color="#edd083" side={2} />
+            </mesh>
+            {[-0.09, 0, 0.09].map((x) => (
+              <mesh key={x} position={[x, 0.065, 0.07]}>
+                <coneGeometry args={[0.04, 0.12, 4]} />
+                <meshStandardMaterial color="#edd083" />
+              </mesh>
+            ))}
+          </group>
+        )}
+      </group>
+      {[-1, 1].map((s) => (
+        <group
+          key={s}
+          ref={s < 0 ? leftArm : rightArm}
+          position={[s * 0.16, 0.4, 0]}
+        >
+          <mesh position={[0, -0.09, 0]} rotation={[0, 0, s * 0.1]}>
+            <capsuleGeometry args={[0.028, 0.14, 3, 6]} />
+            <meshStandardMaterial color="#b8c5cc" />
+          </mesh>
+          <mesh position={[0, -0.19, 0]}>
+            <sphereGeometry args={[0.038, 7, 6]} />
+            <meshStandardMaterial color="#8fa0a8" />
+          </mesh>
+        </group>
+      ))}
+      {[-1, 1].map((s) => (
+        <group
+          key={s}
+          ref={s < 0 ? leftLeg : rightLeg}
+          position={[s * 0.07, 0.19, 0]}
+        >
+          <mesh position={[0, -0.08, 0]}>
+            <capsuleGeometry args={[0.033, 0.1, 3, 6]} />
+            <meshStandardMaterial color="#b5c3c9" />
+          </mesh>
+          <mesh position={[0, -0.17, 0.02]}>
+            <boxGeometry args={[0.08, 0.04, 0.12]} />
+            <meshStandardMaterial color="#5c6a73" />
+          </mesh>
+        </group>
+      ))}
+      {role === "courier" && (
+        <group position={[0, 0.3, -0.15]}>
+          {[-0.06, 0.06].map((x) => (
+            <group key={x} position={[x, 0, 0]}>
+              <mesh>
+                <cylinderGeometry args={[0.04, 0.045, 0.2, 8]} />
+                <meshStandardMaterial color="#8a7d6f" />
+              </mesh>
+              <mesh position={[0, -0.12, 0]}>
+                <coneGeometry args={[0.03, 0.05, 8]} />
+                <meshStandardMaterial
+                  color="#ffb060"
+                  emissive="#ff8a3a"
+                  emissiveIntensity={1.2}
+                />
+              </mesh>
+            </group>
           ))}
         </group>
       )}
+      {role === "builder" && (
+        <>
+          <mesh position={[0, 0.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.13, 0.02, 5, 12]} />
+            <meshStandardMaterial color="#6b4e2e" />
+          </mesh>
+          <mesh position={[0.05, 0.32, -0.15]} rotation={[0, 0, 0.5]}>
+            <boxGeometry args={[0.03, 0.22, 0.03]} />
+            <meshStandardMaterial color="#9aa7ae" />
+          </mesh>
+        </>
+      )}
+      {role === "archivist" && (
+        <>
+          <mesh position={[0.17, 0.24, 0]}>
+            <boxGeometry args={[0.06, 0.11, 0.13]} />
+            <meshStandardMaterial color="#6a4f7a" />
+          </mesh>
+          <mesh position={[0, 0.33, 0]} rotation={[0, 0, 0.9]}>
+            <boxGeometry args={[0.03, 0.34, 0.14]} />
+            <meshStandardMaterial color="#8d7aa3" />
+          </mesh>
+        </>
+      )}
+      {role === "ares" && (
+        <mesh position={[0, 0.27, -0.14]} rotation={[0.08, 0, 0]}>
+          <boxGeometry args={[0.24, 0.3, 0.02]} />
+          <meshStandardMaterial color="#8b2f3a" side={2} />
+        </mesh>
+      )}
       {carrying && (
-        <mesh position={[0, 0.24, 0.22]}>
+        <mesh position={[0, 0.28, 0.22]}>
           <boxGeometry args={[0.22, 0.2, 0.18]} />
           <meshStandardMaterial color="#bba17b" />
         </mesh>

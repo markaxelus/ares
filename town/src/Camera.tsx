@@ -103,8 +103,13 @@ export function GlobeCamera() {
       a.yaw = 0.3;
     } else {
       const planet = planets[view];
-      if (a.where !== view)
+      if (a.where !== view) {
         a.dir = smooth.current.position.clone().sub(planet.origin).normalize();
+        // Arriving from the other planet puts the tunnel in the way: come in from above.
+        const other = planets[view === "brain" ? "factory" : "brain"];
+        const toward = other.origin.clone().sub(planet.origin).normalize();
+        if (a.dir.dot(toward) > 0.2) a.dir = slerp(a.dir, Y, 0.8);
+      }
       a.where = view;
       a.distance = view === "brain" ? 24 : 15;
       a.pitch = 0.35;

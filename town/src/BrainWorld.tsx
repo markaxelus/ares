@@ -17,6 +17,7 @@ import {
   type Tile,
 } from "./planet";
 import { maturity, type Layout, hash } from "./layout";
+import { progress } from "./game";
 import { Pet } from "./Robots";
 import { useTown } from "./store";
 import { brainGate } from "./transit";
@@ -119,6 +120,44 @@ function Details({ node, tile }: { node: BrainNode; tile: number }) {
     </group>
   );
 }
+/** One banner per level around the town hall, so growth shows in the world. */
+function Banners({ tile, level }: { tile: number; level: number }) {
+  const banners = Array.from({ length: level }, (_, i) => {
+    const ring = Math.floor(i / 12),
+      angle = (i % 12) * (Math.PI / 6) + ring * 0.26,
+      r = 0.46 + ring * 0.14;
+    return {
+      key: i,
+      x: Math.cos(angle) * r,
+      z: Math.sin(angle) * r,
+      angle,
+      color: i % 2 ? "#f5bf62" : "#e0705f",
+    };
+  });
+  return (
+    <group
+      position={surface(tile, 0.2)}
+      quaternion={orientation(tile)}
+      onPointerOver={() =>
+        useTown.setState({ hover: `Level ${level} · one banner per level` })
+      }
+      onPointerOut={() => useTown.setState({ hover: null })}
+    >
+      {banners.map((b) => (
+        <group key={b.key} position={[b.x, 0, b.z]} rotation={[0, -b.angle, 0]}>
+          <mesh position={[0, 0.3, 0]} castShadow>
+            <cylinderGeometry args={[0.012, 0.012, 0.6, 5]} />
+            <meshStandardMaterial color="#e5dfc7" />
+          </mesh>
+          <mesh position={[0.08, 0.5, 0]} castShadow>
+            <boxGeometry args={[0.14, 0.11, 0.02]} />
+            <meshStandardMaterial color={b.color} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
 export function railPlacements(
   brain: Brain,
   layout: Layout,
@@ -182,6 +221,13 @@ export function BrainWorld({
     () => (brain && layout ? buildingPlacements(brain, layout) : []),
     [brain, layout],
   );
+  const level = useMemo(() => (brain ? progress(brain).level : 0), [brain]);
+  const hall =
+    brain && layout
+      ? layout.positions.get(
+          brain.nodes.find((n) => n.type === "identity" && !n.parent)?.id || "",
+        )
+      : undefined;
   const rails = useMemo(
     () =>
       brain && layout ? railPlacements(brain, layout, selected, allLinks) : [],
@@ -332,6 +378,9 @@ export function BrainWorld({
               <Details key={n.id} node={n} tile={tile} />
             ) : null;
           })}
+          {hall !== undefined && hall >= 0 && (
+            <Banners tile={hall} level={level} />
+          )}
           <Pet layout={layout} />
         </>
       )}
