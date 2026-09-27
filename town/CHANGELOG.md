@@ -2,6 +2,21 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, a clean knowledge planet with keepers at work
+
+- Scatter removed: no random trees or rocks inland, no planks or spare crate at the Inbox, no
+  dome or rover on the Ares ground. What stays means something: mountains on the pentagons,
+  the gate, the Inbox pad, the dock, one radar mast, and the region's tree on every other free
+  tile that touches the sea, so each continent has a clean fringe.
+- Buildings face their region's square, the seed tile, like houses round a green.
+- Markers are one system now: a pennant in the quest's colour on any place with an open quest
+  (scaffolding, moss and signposts are gone), fog on questions, the gold flag on pinned places,
+  the ring on the selected one. The Quests panel shows the same colours as dots.
+- Keepers: one robot per region in the region's colour, living at a depot by the square (a
+  charging pad and a container as quarters). Each walks over its own region's land to the next
+  place that needs tending, works there facing the building, walks home and charges. Depot and
+  path rules in `depots.ts` with tests; bodies in `Keepers.tsx`; the robot body takes a colour.
+
 ## 2026-09-27, Ares visibly does its one real job
 
 - Inbox ingestion now shows as Ares working: `ingest_start` keeps the factory busy, pulses a

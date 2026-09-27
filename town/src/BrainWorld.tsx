@@ -7,6 +7,7 @@ import { AssetBatches, assets, type Placement } from "./Assets";
 import { biomeColors, Plates, type PlateStyle } from "./Scene";
 import {
   BRAIN_POS,
+  facingOf,
   hexAligned,
   nearestTile,
   orientation,
@@ -19,7 +20,9 @@ import {
   type Tile,
 } from "./planet";
 import { maturity, type Layout, hash } from "./layout";
-import { progress } from "./game";
+import { ASKS, progress, QUEST_COLORS, type QuestKind } from "./game";
+import { depots } from "./depots";
+import { Keepers } from "./Keepers";
 import { Pet } from "./Robots";
 import { useTown } from "./store";
 import { brainGate } from "./transit";
@@ -36,13 +39,18 @@ export function buildingPlacements(brain: Brain, layout: Layout): Placement[] {
   return brain.nodes.flatMap((n) => {
     const tile = layout.positions.get(n.id);
     if (tile === undefined || tile < 0) return [];
+    // Buildings face their region's square, the seed tile, like houses round a green.
+    const square = layout.seeds.get(layout.groupOf.get(n.id) || "");
     return [
       {
         key: n.id,
         nodeId: n.id,
         asset: nodeAsset(n, brain),
         position: surface(tile),
-        quaternion: orientation(tile),
+        quaternion:
+          square !== undefined && square !== tile
+            ? facingOf(tiles[tile], tiles[square])
+            : orientation(tile),
         scale: ["goal", "project"].includes(n.type)
           ? 1
           : 0.72 + maturity(n, brain) * 0.09,
@@ -94,18 +102,19 @@ function Burst({ id }: { id: string }) {
   );
 }
 /**
- * Per-place markers: selection ring, pinned flag, scaffolding for low
- * confidence, moss when stale, fog for a question, an empty signpost when the
- * place has no links, a lamp, and a burst when its quest gets done.
+ * Per-place markers, one system: a selection ring, the pinned flag, a pennant
+ * in the quest's colour when the place needs tending, fog over a question, a
+ * lamp, and a burst when its quest gets done.
+ * @param quest the place's open quest kind, if any
  */
 function Details({
   node,
   tile,
-  orphan,
+  quest,
 }: {
   node: BrainNode;
   tile: number;
-  orphan: boolean;
+  quest?: QuestKind;
 }) {
   const old =
     Date.now() - Date.parse(node.updated || node.created || "") > 90 * 86400000;
@@ -113,31 +122,6 @@ function Details({
   return (
     <group position={surface(tile, 0.2)} quaternion={orientation(tile)}>
       <Burst id={node.id} />
-      {orphan && (
-        <group
-          position={[-0.3, 0, -0.22]}
-          onPointerOver={() =>
-            useTown.setState({ hover: "No links yet · link it to something" })
-          }
-          onPointerOut={() => useTown.setState({ hover: null })}
-        >
-          <mesh position={[0, 0.3, 0]} castShadow>
-            <cylinderGeometry args={[0.014, 0.014, 0.6, 5]} />
-            <meshStandardMaterial color="#b9a88a" />
-          </mesh>
-          {[0.5, 0.38].map((y, i) => (
-            <mesh
-              key={y}
-              position={[i ? -0.07 : 0.07, y, 0]}
-              rotation={[0, i ? 0.5 : -0.5, 0]}
-              castShadow
-            >
-              <boxGeometry args={[0.2, 0.07, 0.02]} />
-              <meshStandardMaterial color="#d9c9a5" />
-            </mesh>
-          ))}
-        </group>
-      )}
       {selected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
           <ringGeometry args={[0.43, 0.47, 32]} />
@@ -156,29 +140,21 @@ function Details({
           </mesh>
         </group>
       )}
-      {node.confidence === "low" && (
-        <group>
-          {[-0.38, 0.38].flatMap((x) =>
-            [-0.3, 0.3].map((z) => (
-              <mesh key={`${x},${z}`} position={[x, 0.35, z]}>
-                <boxGeometry args={[0.035, 0.7, 0.035]} />
-                <meshStandardMaterial color="#c6ad7c" />
-              </mesh>
-            )),
-          )}
-          {[0.2, 0.55].map((y) => (
-            <mesh key={y} position={[0, y, 0.32]}>
-              <boxGeometry args={[0.82, 0.025, 0.025]} />
-              <meshStandardMaterial color="#c6ad7c" />
-            </mesh>
-          ))}
+      {quest && quest !== "question" && (
+        <group
+          position={[0.32, 0, -0.24]}
+          onPointerOver={() => useTown.setState({ hover: ASKS[quest] })}
+          onPointerOut={() => useTown.setState({ hover: null })}
+        >
+          <mesh position={[0, 0.32, 0]} castShadow>
+            <cylinderGeometry args={[0.013, 0.013, 0.64, 5]} />
+            <meshStandardMaterial color="#e5dfc7" />
+          </mesh>
+          <mesh position={[0.075, 0.57, 0]} castShadow>
+            <boxGeometry args={[0.15, 0.1, 0.02]} />
+            <meshStandardMaterial color={QUEST_COLORS[quest]} />
+          </mesh>
         </group>
-      )}
-      {old && (
-        <mesh position={[-0.18, 0.025, 0.15]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.26, 7]} />
-          <meshStandardMaterial color="#72895d" roughness={1} />
-        </mesh>
       )}
       {node.type === "question" && (
         <mesh position={[0, 0.32, 0]} scale={[0.6, 0.3, 0.6]}>
@@ -372,9 +348,8 @@ export function BrainWorld({
     [brain, layout],
   );
   const game = useMemo(() => (brain ? progress(brain) : null), [brain]);
-  const orphans = useMemo(
-    () =>
-      new Set(game?.quests.filter((q) => q.kind === "orphan").map((q) => q.id)),
+  const questOf = useMemo(
+    () => new Map(game?.quests.map((q) => [q.id, q.kind])),
     [game],
   );
   const hall =
@@ -446,23 +421,33 @@ export function BrainWorld({
         layout.owners.has(brainGate.id) ? 0.18 : 0.02,
         "Tunnel gate",
       );
-    const inbox = layout.positions.get("inbox");
-    if (inbox !== undefined && inbox >= 0) {
-      put("pad", "inbox.pad", inbox, 1, orientation(inbox), 0.19);
-      const owner = layout.owners.get(inbox);
-      tiles[inbox].neighbors
-        .filter((n) => free(n) && layout.owners.get(n) === owner)
-        .slice(0, 2)
-        .forEach((n, i) =>
-          put(
-            `inbox:${n}`,
-            i ? "inbox.crate-small" : "inbox.planks",
-            n,
-            1,
-            turned(n, spin(n)),
-          ),
+    // Keeper depots: a charging pad by each region's square and quarters beside it.
+    const titles = new Map(layout.groups.map((g) => [g.id, g.title]));
+    for (const d of depots(layout)) {
+      const title = titles.get(d.region) || d.region;
+      put(
+        `depot:${d.region}`,
+        "factory.pad",
+        d.pad,
+        1,
+        orientation(d.pad),
+        0.17,
+        `Keeper's depot · ${title}`,
+      );
+      if (d.home >= 0)
+        put(
+          `home:${d.region}`,
+          "factory.container",
+          d.home,
+          0.9,
+          facingOf(tiles[d.home], tiles[d.pad]),
+          0.18,
+          `Keeper's quarters · ${title}`,
         );
     }
+    const inbox = layout.positions.get("inbox");
+    if (inbox !== undefined && inbox >= 0)
+      put("pad", "inbox.pad", inbox, 1, orientation(inbox), 0.19);
     const coast = region("oceanaid")
       .map((tile) => ({
         tile,
@@ -478,33 +463,37 @@ export function BrainWorld({
         hexAligned(coast.tile),
         0.09,
       );
-    const ground = region("ares");
-    ["ares.dome", "ares.radar", "ares.rover"].forEach((asset, i) => {
-      const tile = ground[i];
-      if (tile !== undefined)
-        put(asset, asset, tile, 1, turned(tile, spin(tile)));
-    });
-    for (const [tile, owner] of layout.owners) {
+    // Ares launch ground: one radar mast as the landmark.
+    const [mast] = region("ares");
+    if (mast !== undefined)
+      put(
+        "ares.radar",
+        "ares.radar",
+        mast,
+        1,
+        turned(mast, spin(mast)),
+        undefined,
+        "Ares radar mast",
+      );
+    // Coast trees: the region's tree on every other free tile that touches the sea.
+    const shore = [...layout.owners]
+      .filter(
+        ([tile]) =>
+          free(tile) &&
+          tiles[tile].neighbors.some((n) => !layout.owners.has(n)),
+      )
+      .sort((a, b) => a[0] - b[0]);
+    shore.forEach(([tile, owner], i) => {
       const id = layout.groups[owner]?.id;
-      if (!id || !free(tile)) continue;
-      const roll = hash(String(tile)) % 8;
-      if (roll < 2)
+      if (id && i % 2 === 0)
         put(
           `tree:${tile}`,
           `biome.${id}.tree`,
           tile,
-          0.75,
-          turned(tile, spin(tile)),
-        );
-      else if (roll === 2)
-        put(
-          `rock:${tile}`,
-          `biome.${id}.rock`,
-          tile,
           0.7,
           turned(tile, spin(tile)),
         );
-    }
+    });
     return placements;
   }, [layout]);
   return (
@@ -534,10 +523,11 @@ export function BrainWorld({
                 key={n.id}
                 node={n}
                 tile={tile}
-                orphan={orphans.has(n.id)}
+                quest={questOf.get(n.id)}
               />
             ) : null;
           })}
+          {game && <Keepers layout={layout} game={game} />}
           {hall !== undefined && hall >= 0 && game && (
             <Hall tile={hall} level={game.level} streak={game.streak} />
           )}

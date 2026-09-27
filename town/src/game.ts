@@ -28,6 +28,15 @@ const ORDER: QuestKind[] = [
   "stale",
   "sketch",
 ];
+/** Pennant colour per quest kind on the planet; questions show as fog instead. */
+export const QUEST_COLORS: Record<QuestKind, string> = {
+  inbox: "#f0a35e",
+  question: "#c7d8e7",
+  unsure: "#e0705f",
+  orphan: "#7fb0e0",
+  stale: "#8a9a5b",
+  sketch: "#d8ccab",
+};
 /** What each quest asks of you. */
 export const ASKS: Record<QuestKind, string> = {
   inbox: "Sort the inbox",

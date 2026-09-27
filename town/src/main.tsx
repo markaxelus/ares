@@ -8,7 +8,15 @@ import { Tunnel } from "./Tunnel";
 import { Workers } from "./Robots";
 import { useTown, connectBrain, type View } from "./store";
 import { breadcrumb, layoutBrain } from "./layout";
-import { ASKS, DONE, brief, progress, streakLine, type Progress } from "./game";
+import {
+  ASKS,
+  DONE,
+  QUEST_COLORS,
+  brief,
+  progress,
+  streakLine,
+  type Progress,
+} from "./game";
 import { factoryTiles, tiles } from "./planet";
 import type { BrainNode } from "./types";
 import "./style.css";
@@ -200,7 +208,13 @@ function App() {
               }}
             >
               {q.title}
-              <span>{ASKS[q.kind]}</span>
+              <span>
+                <i
+                  className="dot"
+                  style={{ background: QUEST_COLORS[q.kind] }}
+                />
+                {ASKS[q.kind]}
+              </span>
             </button>
           ))}
           {game.quests.length > shownQuests.length && (

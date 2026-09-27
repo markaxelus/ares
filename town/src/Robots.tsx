@@ -43,6 +43,7 @@ const colors: Record<Role, string> = {
   archivist: "#9b9bc9",
   scout: "#74b6c6",
   ares: "#d7c597",
+  keeper: "#9fb3a6",
 };
 const labels: Record<WorkerRole, string> = {
   courier: "Courier",
@@ -53,16 +54,19 @@ const labels: Record<WorkerRole, string> = {
  * Robot body from primitives: capsule torso with a heart light, a visor with
  * two blinking eyes, a pulsing antenna, hinged arms and legs, and gear per
  * role. Riders in orbit pass shadow false.
+ * @param color overrides the role colour, so keepers wear their region's colour
  * @param motion per-frame walk and carry flags from the worker, if any
  */
 export function Robot({
   role,
+  color: tint,
   walking = false,
   carrying = false,
   shadow = true,
   motion,
 }: {
   role: Role;
+  color?: string;
   walking?: boolean;
   carrying?: boolean;
   shadow?: boolean;
@@ -75,7 +79,7 @@ export function Robot({
     leftArm = useRef<Group>(null!),
     rightArm = useRef<Group>(null!),
     tip = useRef<MeshStandardMaterial>(null!);
-  const color = colors[role];
+  const color = tint ?? colors[role];
   const eyes = useMemo(
     () =>
       new MeshStandardMaterial({
@@ -287,6 +291,18 @@ export function Robot({
           <boxGeometry args={[0.24, 0.3, 0.02]} />
           <meshStandardMaterial color="#8b2f3a" side={2} />
         </mesh>
+      )}
+      {role === "keeper" && (
+        <group position={[-0.12, 0.3, -0.13]} rotation={[0.35, 0, 0.5]}>
+          <mesh>
+            <cylinderGeometry args={[0.012, 0.012, 0.5, 5]} />
+            <meshStandardMaterial color="#a88a5c" />
+          </mesh>
+          <mesh position={[0, 0.26, 0]}>
+            <boxGeometry args={[0.14, 0.03, 0.03]} />
+            <meshStandardMaterial color="#7c8a92" />
+          </mesh>
+        </group>
       )}
       {carrying && (
         <mesh position={[0, 0.28, 0.22]}>

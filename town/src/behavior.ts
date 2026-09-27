@@ -1,7 +1,8 @@
 // Pure rules: which robot answers which brain event, which packages ride the tunnel.
 import type { BrainEvent } from "./types.ts";
 import { tilePath as planetPath, tiles, type Tile } from "./planet.ts";
-export type Role = "courier" | "builder" | "archivist" | "scout" | "ares";
+export type Role =
+  "courier" | "builder" | "archivist" | "scout" | "ares" | "keeper";
 export type Job = { role: Role; ids: string[]; event: BrainEvent };
 export function eventJobs(event: BrainEvent): Job[] {
   if (event.kind === "note")
