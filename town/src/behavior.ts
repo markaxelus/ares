@@ -1,5 +1,6 @@
+// Pure rules: which robot answers which brain event, which packages ride the tunnel.
 import type { BrainEvent } from "./types.ts";
-import { tiles } from "./planet.ts";
+import { tilePath as planetPath, tiles, type Tile } from "./planet.ts";
 export type Role = "courier" | "builder" | "archivist" | "scout" | "ares";
 export type Job = { role: Role; ids: string[]; event: BrainEvent };
 export function eventJobs(event: BrainEvent): Job[] {
@@ -13,20 +14,27 @@ export function eventJobs(event: BrainEvent): Job[] {
     return [{ role: "scout", ids: event.ids, event }];
   return [];
 }
-export function tilePath(start: number, end: number) {
-  const queue = [start],
-    previous = new Map<number, number | null>([[start, null]]);
-  for (let i = 0; i < queue.length && !previous.has(end); i++)
-    for (const n of tiles[queue[i]].neighbors)
-      if (!previous.has(n)) {
-        previous.set(n, queue[i]);
-        queue.push(n);
-      }
-  const path: number[] = [];
-  let next: number | null = end;
-  while (next !== null) {
-    path.unshift(next);
-    next = previous.get(next) ?? null;
-  }
-  return path;
+/**
+ * Knowledge packages. Agent reads carry places from the planet to the factory,
+ * where the thinking happens; writes ship the output back to the planet.
+ */
+export type Transfer = {
+  to: "factory" | "brain";
+  ids: string[];
+  event: BrainEvent;
+};
+export function eventTransfers(event: BrainEvent): Transfer[] {
+  if (!event.ids.length) return [];
+  if (event.kind === "mcp_read" && event.source.startsWith("mcp:"))
+    return [{ to: "factory", ids: event.ids, event }];
+  if (["node_added", "node_updated", "ingest_done"].includes(event.kind))
+    return [{ to: "brain", ids: event.ids, event }];
+  return [];
+}
+/**
+ * Breadth-first route over neighbouring tiles, inclusive of both ends.
+ * @param set the planet's tiles; the knowledge planet by default
+ */
+export function tilePath(start: number, end: number, set: Tile[] = tiles) {
+  return planetPath(start, end, set);
 }

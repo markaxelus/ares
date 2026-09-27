@@ -1,20 +1,46 @@
-// Robot workers driven by brain events, the orbiting station and scout, and a pet.
+// Robots rest on charging pads at the factory and ride the tunnel to jobs on the
+// knowledge planet; the courier flies its shuttle; the Ares station circles the
+// factory; the scout circles the planet; a dog wanders the town hall land.
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Group, Mesh, Vector3 } from "three";
+import { Group, Mesh, QuadraticBezierCurve3, Vector3 } from "three";
 import { Asset } from "./Assets";
-import { orientation, surface } from "./BrainWorld";
-import { tiles, RADIUS } from "./planet";
 import { eventJobs, tilePath, type Job, type Role } from "./behavior";
+import { factoryLayout, type WorkerRole } from "./Factory";
 import type { Layout } from "./layout";
+import {
+  BRAIN_POS,
+  FACTORY_POS,
+  FACTORY_RADIUS,
+  factoryTiles,
+  RADIUS,
+  slerpNormal,
+  surface,
+  surfaceOf,
+  tiles,
+  type Tile,
+} from "./planet";
 import { useTown } from "./store";
-const up = new Vector3(0, 1, 0);
+import {
+  brainGate,
+  brainMouth,
+  factoryGate,
+  factoryMouth,
+  RIDE_SECONDS,
+  tunnel,
+} from "./transit";
+const Y = new Vector3(0, 1, 0);
 const colors: Record<Role, string> = {
   courier: "#cd9368",
   builder: "#ddc35e",
   archivist: "#9b9bc9",
   scout: "#74b6c6",
   ares: "#d7c597",
+};
+const labels: Record<WorkerRole, string> = {
+  courier: "Courier",
+  builder: "Builder",
+  archivist: "Archivist",
 };
 /** Primitive robot body with role accessories. Riders in orbit pass shadow false. */
 export function Robot({
@@ -154,35 +180,234 @@ export function Robot({
     </group>
   );
 }
-type Active = {
-  job: Job;
-  start: number;
-  path: number[];
-  walk: number;
-  duration: number;
-  tile: number;
+/** Where a robot is and what it is doing, in world space. */
+type Pose = {
+  position: Vector3;
+  up: Vector3;
+  walking: boolean;
+  carrying: boolean;
+  riding: boolean;
+  flying: boolean;
+  unloading: boolean;
 };
-function Worker({
-  role,
-  layout,
-}: {
-  role: "courier" | "builder" | "archivist";
-  layout: Layout;
-}) {
+/** One leg of a job. at() writes the pose for a fraction of the leg. */
+type Segment = {
+  duration: number;
+  at: (u: number, pose: Pose) => void;
+  activity?: string;
+};
+const ease = (x: number) => x * x * (3 - 2 * x);
+function brainPoint(tile: number, height = 0.22) {
+  return BRAIN_POS.clone().add(surface(tile, height));
+}
+function factoryPoint(tile: number, height = 0.22) {
+  return FACTORY_POS.clone().add(surfaceOf(factoryTiles[tile], height));
+}
+/** Walk a tile path over a planet. */
+function walk(
+  set: Tile[],
+  origin: Vector3,
+  radius: number,
+  path: number[],
+  carrying = false,
+  activity?: string,
+): Segment {
+  const last = path.length - 1;
+  return {
+    duration: Math.max(0.6, last * 0.24),
+    activity,
+    at(u, pose) {
+      const f = u * last,
+        i = Math.min(last, Math.floor(f));
+      const n = last
+        ? slerpNormal(
+            set[path[i]].normal,
+            set[path[Math.min(last, i + 1)]].normal,
+            f - i,
+          )
+        : set[path[0]].normal.clone();
+      pose.position.copy(origin).addScaledVector(n, radius + 0.22);
+      pose.up.copy(n);
+      pose.walking = u < 1;
+      pose.carrying = carrying;
+    },
+  };
+}
+/** Ride the tunnel in a capsule. */
+function ride(to: "brain" | "factory", activity?: string): Segment {
+  return {
+    duration: RIDE_SECONDS,
+    activity,
+    at(u, pose) {
+      tunnel.getPointAt(to === "factory" ? u : 1 - u, pose.position);
+      pose.up.copy(Y);
+      pose.riding = true;
+    },
+  };
+}
+/** Straight eased move between two world points. */
+function hop(
+  from: Vector3,
+  to: Vector3,
+  up: Vector3,
+  duration: number,
+  flags: Partial<Pose> = {},
+): Segment {
+  return {
+    duration,
+    at(u, pose) {
+      pose.position.lerpVectors(from, to, ease(u));
+      pose.up.copy(up);
+      Object.assign(pose, flags);
+    },
+  };
+}
+function stand(
+  at: Vector3,
+  up: Vector3,
+  duration: number,
+  flags: Partial<Pose> = {},
+  activity?: string,
+): Segment {
+  return {
+    duration,
+    activity,
+    at(_, pose) {
+      pose.position.copy(at);
+      pose.up.copy(up);
+      Object.assign(pose, flags);
+    },
+  };
+}
+/** Fly an arc between two world points; the courier shuttle. */
+function fly(
+  from: Vector3,
+  to: Vector3,
+  duration: number,
+  activity?: string,
+): Segment {
+  const curve = new QuadraticBezierCurve3(
+    from,
+    from
+      .clone()
+      .lerp(to, 0.5)
+      .add(new Vector3(0, 7, 0)),
+    to,
+  );
+  return {
+    duration,
+    activity,
+    at(u, pose) {
+      curve.getPointAt(ease(u), pose.position);
+      pose.up.copy(Y);
+      pose.flying = true;
+    },
+  };
+}
+type Plan = { segments: Segment[]; workAt: number };
+/**
+ * Lay out a whole trip for a job, from the charging pad and back to it.
+ * Returns null while the target tile is unknown (the brain may not have
+ * refreshed yet) so the caller can retry.
+ */
+function planJob(
+  role: WorkerRole,
+  job: Job,
+  layout: Layout,
+  inbox: number,
+  pad: number,
+): Plan | null {
+  const name = labels[role];
+  const home = factoryPoint(pad),
+    homeUp = factoryTiles[pad].normal;
+  if (role === "courier") {
+    const inboxUp = tiles[inbox].normal,
+      inboxTop = brainPoint(inbox, 2.6),
+      inboxPad = brainPoint(inbox, 0.3),
+      homeTop = factoryPoint(pad, 2.4);
+    const segments = [
+      hop(home, homeTop, homeUp, 0.9, { flying: true }),
+      fly(homeTop, inboxTop, 3, `${name} is flying a note to the Inbox`),
+      hop(inboxTop, inboxPad, inboxUp, 0.9, { flying: true }),
+      stand(
+        inboxPad,
+        inboxUp,
+        2.2,
+        { unloading: true },
+        `${name} is unloading at the Inbox`,
+      ),
+      hop(inboxPad, inboxTop, inboxUp, 0.9, { flying: true }),
+      fly(inboxTop, homeTop, 3, `${name} is flying home`),
+      hop(homeTop, home, homeUp, 0.9, { flying: true }),
+    ];
+    return { segments, workAt: 5.7 };
+  }
+  const target = layout.positions.get(job.ids[0]);
+  if (target === undefined || target < 0) return null;
+  const brainWalk = (path: number[], carrying = false, activity?: string) =>
+    walk(tiles, BRAIN_POS, RADIUS, path, carrying, activity);
+  const factoryWalk = (path: number[]) =>
+    walk(factoryTiles, FACTORY_POS, FACTORY_RADIUS, path);
+  const gateOut = brainPoint(brainGate.id),
+    gateIn = factoryPoint(factoryGate.id);
+  const outbound = [
+    factoryWalk(tilePath(pad, factoryGate.id, factoryTiles)),
+    hop(gateIn, factoryMouth, factoryGate.normal, 0.5, { riding: true }),
+    ride("brain", `${name} is riding the tunnel to the planet`),
+    hop(brainMouth, gateOut, brainGate.normal, 0.5, { riding: true }),
+  ];
+  const inbound = [
+    hop(gateOut, brainMouth, brainGate.normal, 0.5, { riding: true }),
+    ride("factory", `${name} is heading home to charge`),
+    hop(factoryMouth, gateIn, factoryGate.normal, 0.5, { riding: true }),
+    factoryWalk(tilePath(factoryGate.id, pad, factoryTiles)),
+  ];
+  const targetAt = brainPoint(target),
+    targetUp = tiles[target].normal;
+  const work =
+    role === "builder"
+      ? [
+          brainWalk(tilePath(brainGate.id, target)),
+          stand(targetAt, targetUp, 2.4, {}, `${name} is raising a building`),
+        ]
+      : [
+          brainWalk(tilePath(brainGate.id, inbox)),
+          brainWalk(tilePath(inbox, target), true, `${name} is filing a crate`),
+          stand(targetAt, targetUp, 1),
+        ];
+  const segments = [
+    ...outbound,
+    ...work,
+    brainWalk(tilePath(target, brainGate.id)),
+    ...inbound,
+  ];
+  const workAt = [...outbound, ...work.slice(0, -1)].reduce(
+    (sum, s) => sum + s.duration,
+    0,
+  );
+  return { segments, workAt };
+}
+function Worker({ role, layout }: { role: WorkerRole; layout: Layout }) {
   const body = useRef<Group>(null!),
-    pod = useRef<Group>(null!),
+    model = useRef<Group>(null!),
+    shuttle = useRef<Group>(null!),
+    capsule = useRef<Mesh>(null!),
     crates = useRef<Group>(null!);
   const queue = useRef<Job[]>([]),
     seen = useRef(new Set<string>()),
-    active = useRef<Active | null>(null);
-  const latest = useTown((s) => s.events);
-  const phase = useRef({ walk: false, carry: false });
-  const model = useRef<Group>(null!);
-  const home = layout.positions.get("inbox") ?? layout.seeds.get("inbox") ?? 0;
-  const current = useRef(home);
-  const wander = useRef({ start: 0, from: home, to: home });
+    plan = useRef<{ start: number; segments: Segment[]; index: number } | null>(
+      null,
+    );
+  const motion = useRef({ walk: false, carry: false });
+  const events = useTown((s) => s.events);
+  const pad = factoryLayout.pads[role];
+  const home = useMemo(
+    () => ({ position: factoryPoint(pad), up: factoryTiles[pad].normal }),
+    [pad],
+  );
+  const inbox = layout.positions.get("inbox") ?? layout.seeds.get("inbox") ?? 0;
   useEffect(() => {
-    for (const event of latest) {
+    for (const event of events) {
       const key =
         event.sequence ||
         `${event.timestamp}:${event.kind}:${event.ids.join(",")}`;
@@ -191,8 +416,7 @@ function Worker({
       for (const job of eventJobs(event).filter((j) => j.role === role)) {
         if (
           role === "builder" &&
-          (queue.current.some((q) => q.ids[0] === job.ids[0]) ||
-            active.current?.job.ids[0] === job.ids[0])
+          queue.current.some((q) => q.ids[0] === job.ids[0])
         )
           continue;
         queue.current.push(job);
@@ -200,152 +424,120 @@ function Worker({
     }
     if (seen.current.size > 1024)
       seen.current = new Set([...seen.current].slice(-512));
-  }, [latest, role]);
+  }, [events, role]);
+  const pose = useMemo<Pose>(
+    () => ({
+      position: home.position.clone(),
+      up: home.up.clone(),
+      walking: false,
+      carrying: false,
+      riding: false,
+      flying: false,
+      unloading: false,
+    }),
+    [home],
+  );
   useFrame(({ clock }) => {
     const now = performance.now();
-    let a = active.current;
-    if (!a && queue.current.length) {
+    if (!plan.current && queue.current.length) {
       const job = queue.current[0];
-      const target =
-        role === "courier" ? home : layout.positions.get(job.ids[0]);
-      if (target !== undefined && target >= 0) {
+      const next = planJob(role, job, layout, inbox, pad);
+      if (next) {
         queue.current.shift();
-        const path = tilePath(
-            role === "archivist" ? home : current.current,
-            target,
-          ),
-          walk = Math.max(0.7, (path.length - 1) * 0.22);
-        a = {
-          job,
-          start: now,
-          path,
-          walk,
-          duration: role === "courier" ? 7 : walk + 2.5,
-          tile: target,
-        };
-        active.current = a;
-        const label =
-          role === "courier"
-            ? "Courier is delivering a note"
-            : role === "builder"
-              ? "Builder is raising a building"
-              : "Archivist is filing a crate";
-        useTown.setState({ activity: label });
+        plan.current = { start: now, segments: next.segments, index: -1 };
         if (role === "builder")
           useTown.setState((s) => ({
-            builds: { ...s.builds, [job.ids[0]]: now + walk * 1000 },
+            builds: { ...s.builds, [job.ids[0]]: now + next.workAt * 1000 },
           }));
       } else if (Date.now() - Date.parse(job.event.timestamp) > 30000) {
         queue.current.shift();
       }
     }
-    const t = a ? (now - a.start) / 1000 : 0;
-    let n: Vector3;
-    let walking = false,
-      carrying = false;
-    if (a) {
-      const f = Math.min(1, t / a.walk) * (a.path.length - 1),
-        i = Math.min(a.path.length - 1, Math.floor(f));
-      n = tiles[a.path[i]].normal
-        .clone()
-        .lerp(tiles[a.path[Math.min(i + 1, a.path.length - 1)]].normal, f - i)
-        .normalize();
-      walking = t < a.walk;
-      carrying = role === "archivist" && walking;
-      if (role === "courier") {
-        n = tiles[home].normal.clone();
-        const altitude =
-          t < 2
-            ? Math.pow(1 - t / 2, 2) * 8
-            : t > 5
-              ? Math.pow((t - 5) / 2, 2) * 8
-              : 0;
-        pod.current.position.copy(n).multiplyScalar(RADIUS + 0.3 + altitude);
-        pod.current.quaternion.copy(orientation(home));
-        pod.current.visible = t < 2.8 || t > 4.8;
-        crates.current.visible = t > 1.8;
+    pose.walking =
+      pose.carrying =
+      pose.riding =
+      pose.flying =
+      pose.unloading =
+        false;
+    const p = plan.current;
+    if (p) {
+      let t = (now - p.start) / 1000,
+        i = 0;
+      while (i < p.segments.length && t > p.segments[i].duration) {
+        t -= p.segments[i].duration;
+        i++;
       }
-      if (t > a.duration) {
-        current.current = a.tile;
-        active.current = null;
+      if (i >= p.segments.length) {
+        plan.current = null;
         useTown.setState({
-          activity:
-            role === "courier"
-              ? "Courier delivered to Inbox"
-              : role === "builder"
-                ? "Building ready"
-                : "Crate filed",
+          activity: `${labels[role]} is back on the charging pad`,
         });
+        pose.position.copy(home.position);
+        pose.up.copy(home.up);
+      } else {
+        const segment = p.segments[i];
+        if (i !== p.index) {
+          p.index = i;
+          if (segment.activity)
+            useTown.setState({ activity: segment.activity });
+        }
+        segment.at(Math.min(1, t / segment.duration), pose);
       }
     } else {
-      if (now - wander.current.start > 4500) {
-        const from = current.current;
-        const choices = tiles[from].neighbors.filter(
-          (id) => layout.owners.get(id) === layout.owners.get(from),
-        );
-        const to =
-          choices[
-            Math.floor(clock.elapsedTime) % Math.max(choices.length, 1)
-          ] ?? from;
-        wander.current = { start: now, from, to };
-        current.current = to;
-      }
-      const w = wander.current,
-        f = Math.min(1, (now - w.start) / 2200);
-      n = tiles[w.from].normal.clone().lerp(tiles[w.to].normal, f).normalize();
-      walking = f < 1;
-      pod.current.visible = false;
+      pose.position.copy(home.position);
+      pose.up.copy(home.up);
     }
-    const destination = n.clone().multiplyScalar(RADIUS + 0.22),
-      direction = destination.clone().sub(body.current.position);
-    body.current.quaternion.setFromUnitVectors(up, n);
-    if (direction.lengthSq() > 0.000001 && direction.length() < 1) {
+    const direction = pose.position.clone().sub(body.current.position);
+    body.current.quaternion.setFromUnitVectors(Y, pose.up);
+    if (direction.lengthSq() > 0.000001 && direction.length() < 1.5) {
       direction.applyQuaternion(body.current.quaternion.clone().invert());
       model.current.rotation.y = Math.atan2(direction.x, direction.z);
     }
-    body.current.position.copy(destination);
-    model.current.rotation.z = walking
+    body.current.position.copy(pose.position);
+    model.current.rotation.z = pose.walking
       ? Math.sin(clock.elapsedTime * 11) * 0.08
       : Math.sin(clock.elapsedTime * 2) * 0.025;
-    // Accessory arms and a carried crate visibly distinguish archival work.
-    phase.current = { walk: walking, carry: carrying };
+    motion.current = { walk: pose.walking, carry: pose.carrying };
+    capsule.current.visible = pose.riding;
+    shuttle.current.visible = pose.flying || pose.unloading;
+    crates.current.visible = pose.unloading;
     model.current.children.forEach((child) => {
-      if (child.name === "carry") child.visible = carrying;
+      if (child.name === "carry") child.visible = pose.carrying;
     });
   });
   return (
-    <>
-      <group ref={body}>
-        <group ref={model}>
-          <AnimatedRobot role={role} motion={phase} />
-          <mesh name="carry" position={[0, 0.27, 0.27]} visible={false}>
-            <boxGeometry args={[0.24, 0.22, 0.2]} />
-            <meshStandardMaterial color="#bc9971" />
-          </mesh>
-        </group>
+    <group ref={body}>
+      <group ref={model}>
+        <AnimatedRobot role={role} motion={motion} />
+        <mesh name="carry" position={[0, 0.27, 0.27]} visible={false}>
+          <boxGeometry args={[0.24, 0.22, 0.2]} />
+          <meshStandardMaterial color="#bc9971" />
+        </mesh>
       </group>
-      <group ref={pod} visible={false}>
+      <mesh ref={capsule} visible={false} position={[0, 0.4, 0]}>
+        <capsuleGeometry args={[0.36, 0.5, 6, 12]} />
+        <meshStandardMaterial
+          color="#bfe6ff"
+          transparent
+          opacity={0.28}
+          depthWrite={false}
+        />
+      </mesh>
+      <group ref={shuttle} visible={false} position={[0, -0.14, 0]} scale={1.4}>
         <Suspense fallback={null}>
-          <group position={[0, 0.12, 0]} scale={1.4}>
-            <Asset id="ares.shuttle" />
-          </group>
+          <Asset id="ares.shuttle" />
         </Suspense>
       </group>
-      <group
-        ref={crates}
-        position={surface(home, 0.23)}
-        quaternion={orientation(home)}
-        visible={false}
-      >
+      <group ref={crates} visible={false}>
         <Suspense fallback={null}>
-          {[-0.25, 0.25].map((x, i) => (
-            <group key={i} position={[x, 0, 0.15]} scale={0.42}>
+          {[-0.55, 0.55].map((x, i) => (
+            <group key={i} position={[x, 0, 0.25]} scale={0.42}>
               <Asset id="inbox.crate" />
             </group>
           ))}
         </Suspense>
       </group>
-    </>
+    </group>
   );
 }
 function AnimatedRobot({
@@ -368,9 +560,51 @@ function AnimatedRobot({
     </group>
   );
 }
-function Orbit({ layout }: { layout: Layout }) {
-  const station = useRef<Group>(null!),
-    scout = useRef<Group>(null!),
+/** The Ares station circles the factory with Ares aboard. */
+function Station() {
+  const ref = useRef<Group>(null!);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime * 0.05;
+    ref.current.position.set(
+      FACTORY_POS.x + Math.cos(t) * 8.6,
+      FACTORY_POS.y + 3.4,
+      FACTORY_POS.z + Math.sin(t) * 8.6,
+    );
+    ref.current.rotation.y = -t;
+  });
+  return (
+    <group
+      ref={ref}
+      scale={0.68}
+      onPointerOver={() => useTown.setState({ hover: "Ares station" })}
+      onPointerOut={() => useTown.setState({ hover: null })}
+    >
+      <Suspense fallback={null}>
+        <Asset id="station.core" shadow={false} />
+        <group position={[0, 0, 1]}>
+          <Asset id="station.corridor" shadow={false} />
+        </group>
+        <group position={[0, 0, -1]}>
+          <Asset id="station.corridor" shadow={false} />
+        </group>
+        {[-1, 1].map((x) => (
+          <group key={x} position={[x * 1.5, 0.25, 0]}>
+            <Asset id="station.solar" shadow={false} />
+          </group>
+        ))}
+        <group position={[0, 1.1, 0]}>
+          <Asset id="station.dish" shadow={false} />
+        </group>
+      </Suspense>
+      <group position={[0.6, 0.6, 0.55]} scale={0.8}>
+        <Robot role="ares" shadow={false} />
+      </group>
+    </group>
+  );
+}
+/** The scout satellite circles the knowledge planet and sweeps what agents read. */
+function Scout({ layout }: { layout: Layout }) {
+  const scout = useRef<Group>(null!),
     sweep = useRef<Mesh>(null!);
   const events = useTown((s) => s.events);
   const seen = useRef(new Set<string>());
@@ -383,7 +617,6 @@ function Orbit({ layout }: { layout: Layout }) {
       if (eventJobs(event).some((j) => j.role === "scout")) {
         active.current = { start: performance.now(), ids: event.ids };
         useTown.setState((s) => ({
-          activity: `Scout is reading ${event.ids.length} places`,
           illuminated: {
             ...s.illuminated,
             ...Object.fromEntries(
@@ -397,81 +630,49 @@ function Orbit({ layout }: { layout: Layout }) {
       seen.current = new Set([...seen.current].slice(-512));
   }, [events]);
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime * 0.035;
-    station.current.position.set(Math.cos(t) * 13, 5, Math.sin(t) * 13);
-    station.current.rotation.y = -t;
     const read = active.current,
       first = read?.ids
         .map((id) => layout.positions.get(id))
-        .find((id) => id !== undefined);
+        .find((id) => id !== undefined && id >= 0);
     const angle = -clock.elapsedTime * 0.06;
     const target =
       first !== undefined
         ? tiles[first].normal
         : new Vector3(Math.cos(angle), 0.45, Math.sin(angle)).normalize();
-    scout.current.position.copy(target).multiplyScalar(RADIUS + 4);
-    scout.current.quaternion.setFromUnitVectors(up, target);
+    scout.current.position.copy(BRAIN_POS).addScaledVector(target, RADIUS + 4);
+    scout.current.quaternion.setFromUnitVectors(Y, target);
     sweep.current.visible = !!read && performance.now() - read.start < 6500;
     if (read && performance.now() - read.start > 6500) active.current = null;
   });
   return (
-    <>
-      <group
-        ref={station}
-        scale={0.68}
-        onPointerOver={() => useTown.setState({ hover: "Ares station" })}
-        onPointerOut={() => useTown.setState({ hover: null })}
-      >
-        <Suspense fallback={null}>
-          <Asset id="station.core" shadow={false} />
-          <group position={[0, 0, 1]}>
-            <Asset id="station.corridor" shadow={false} />
-          </group>
-          <group position={[0, 0, -1]}>
-            <Asset id="station.corridor" shadow={false} />
-          </group>
-          {[-1, 1].map((x) => (
-            <group key={x} position={[x * 1.5, 0.25, 0]}>
-              <Asset id="station.solar" shadow={false} />
-            </group>
-          ))}
-          <group position={[0, 1.1, 0]}>
-            <Asset id="station.dish" shadow={false} />
-          </group>
-        </Suspense>
-        <group position={[0.6, 0.6, 0.55]} scale={0.8}>
-          <Robot role="ares" shadow={false} />
+    <group
+      ref={scout}
+      onPointerOver={() => useTown.setState({ hover: "Scout satellite" })}
+      onPointerOut={() => useTown.setState({ hover: null })}
+    >
+      <Suspense fallback={null}>
+        <group scale={0.5}>
+          <Asset id="scout.satellite" shadow={false} />
         </group>
+      </Suspense>
+      <group position={[0, 0.25, 0]} scale={0.65}>
+        <Robot role="scout" shadow={false} />
       </group>
-      <group
-        ref={scout}
-        onPointerOver={() => useTown.setState({ hover: "Scout satellite" })}
-        onPointerOut={() => useTown.setState({ hover: null })}
-      >
-        <Suspense fallback={null}>
-          <group scale={0.5}>
-            <Asset id="scout.satellite" shadow={false} />
-          </group>
-        </Suspense>
-        <group position={[0, 0.25, 0]} scale={0.65}>
-          <Robot role="scout" shadow={false} />
-        </group>
-        <mesh ref={sweep} position={[0, -1.8, 0]}>
-          <coneGeometry args={[1.4, 3.6, 24, 1, true]} />
-          <meshBasicMaterial
-            color="#81cadd"
-            transparent
-            opacity={0.12}
-            depthWrite={false}
-            side={2}
-          />
-        </mesh>
-      </group>
-    </>
+      <mesh ref={sweep} position={[0, -1.8, 0]}>
+        <coneGeometry args={[1.4, 3.6, 24, 1, true]} />
+        <meshBasicMaterial
+          color="#81cadd"
+          transparent
+          opacity={0.12}
+          depthWrite={false}
+          side={2}
+        />
+      </mesh>
+    </group>
   );
 }
-/** A dog that wanders the town hall land. Life on the planet, no job attached. */
-function Pet({ layout }: { layout: Layout }) {
+/** A dog that wanders the town hall land, in the knowledge planet's frame. */
+export function Pet({ layout }: { layout: Layout }) {
   const body = useRef<Group>(null!),
     model = useRef<Group>(null!);
   const home = layout.seeds.get("identity") ?? 0;
@@ -502,7 +703,7 @@ function Pet({ layout }: { layout: Layout }) {
       .normalize();
     const destination = n.clone().multiplyScalar(RADIUS + 0.18),
       direction = destination.clone().sub(body.current.position);
-    body.current.quaternion.setFromUnitVectors(up, n);
+    body.current.quaternion.setFromUnitVectors(Y, n);
     if (direction.lengthSq() > 0.000001 && direction.length() < 1) {
       direction.applyQuaternion(body.current.quaternion.clone().invert());
       model.current.rotation.y = Math.atan2(direction.x, direction.z);
@@ -525,14 +726,15 @@ function Pet({ layout }: { layout: Layout }) {
     </group>
   );
 }
+/** Everything that moves between or around the planets, in world space. */
 export function Workers({ layout }: { layout: Layout }) {
   return (
     <>
       <Worker role="courier" layout={layout} />
       <Worker role="builder" layout={layout} />
       <Worker role="archivist" layout={layout} />
-      <Pet layout={layout} />
-      <Orbit layout={layout} />
+      <Station />
+      <Scout layout={layout} />
     </>
   );
 }

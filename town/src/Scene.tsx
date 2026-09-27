@@ -1,8 +1,9 @@
-// Planet scene: plates, sun and shadows, camera, moons and the frame renderer.
+// Scene shell: generic plates, the camera, sun and shadows, moons, stars and the renderer.
 // Full resolution with MSAA is the default; the pixel-art pass is an opt-in look.
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Stars, useProgress } from "@react-three/drei";
+import { CameraControls, Stars, useProgress } from "@react-three/drei";
+import CameraControlsImpl from "camera-controls";
 import {
   Color,
   DirectionalLight,
@@ -11,16 +12,21 @@ import {
   Matrix4,
   MeshStandardMaterial,
   PerspectiveCamera,
-  Quaternion,
   Vector3,
 } from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPixelatedPass } from "three/addons/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { OrbitControls as Controls } from "three-stdlib";
 import { Asset } from "./Assets";
-import { tiles, plateGeometry, RADIUS } from "./planet";
-import { useTown } from "./store";
+import {
+  BRAIN_POS,
+  FACTORY_POS,
+  planets,
+  plateGeometry,
+  surfaceOf,
+  type Tile,
+} from "./planet";
+import { useTown, type Focus } from "./store";
 
 export const biomeColors = [
   "#71a793",
@@ -34,47 +40,44 @@ export const biomeColors = [
   "#bb997c",
   "#829c9a",
 ];
+export type PlateStyle = { color: string; height: number; lighten?: number };
+/**
+ * Instanced plates for one planet, in that planet's local frame.
+ * @param style memoised by the caller; it runs once per tile per change
+ */
 export function Plates({
-  owners = new Map<number, number>(),
-  patches = new Map<number, number>(),
+  tiles: set,
+  style,
   onTile,
 }: {
-  owners?: Map<number, number>;
-  patches?: Map<number, number>;
+  tiles: Tile[];
+  style: (tile: Tile) => PlateStyle;
   onTile?: (id: number) => void;
 }) {
   const batches = useMemo(() => {
-    const groups = new Map<string, typeof tiles>();
-    for (const t of tiles) {
+    const groups = new Map<string, Tile[]>();
+    for (const t of set) {
       const arr = groups.get(t.shape) || [];
       arr.push(t);
       groups.set(t.shape, arr);
     }
     return [...groups.values()];
-  }, []);
+  }, [set]);
   return (
     <>
       {batches.map((batch, i) => (
-        <PlateBatch
-          key={i}
-          batch={batch}
-          owners={owners}
-          patches={patches}
-          onTile={onTile}
-        />
+        <PlateBatch key={i} batch={batch} style={style} onTile={onTile} />
       ))}
     </>
   );
 }
 function PlateBatch({
   batch,
-  owners,
-  patches,
+  style,
   onTile,
 }: {
-  batch: typeof tiles;
-  owners: Map<number, number>;
-  patches: Map<number, number>;
+  batch: Tile[];
+  style: (tile: Tile) => PlateStyle;
   onTile?: (id: number) => void;
 }) {
   const ref = useRef<InstancedMesh>(null!);
@@ -85,29 +88,24 @@ function PlateBatch({
   );
   useEffect(() => {
     batch.forEach((tile, i) => {
-      const owner = owners.get(tile.id);
-      const height = owner === undefined ? -0.07 : 0.08;
+      const s = style(tile);
       ref.current.setMatrixAt(
         i,
         new Matrix4().compose(
-          tile.center.clone().addScaledVector(tile.normal, height),
+          tile.center.clone().addScaledVector(tile.normal, s.height),
           tile.quaternion,
           new Vector3(1, 1, 1),
         ),
       );
       ref.current.setColorAt(
         i,
-        new Color(
-          owner === undefined
-            ? "#2f617b"
-            : biomeColors[owner % biomeColors.length],
-        ).offsetHSL(0, 0, (patches.get(tile.id) || 0) * 0.035),
+        new Color(s.color).offsetHSL(0, 0, s.lighten || 0),
       );
     });
     ref.current.instanceMatrix.needsUpdate = true;
     if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
     ref.current.computeBoundingSphere();
-  }, [batch, owners, patches]);
+  }, [batch, style]);
   useEffect(
     () => () => {
       geo.dispose();
@@ -129,6 +127,11 @@ function PlateBatch({
       }}
     />
   );
+}
+/** World point the camera and the pixel grid anchor to for a focus. */
+export function focusAnchor(focus: Focus) {
+  const planet = planets[focus.planet];
+  return planet.origin.clone().add(surfaceOf(planet.tiles[focus.tile], 0.35));
 }
 /**
  * Draws every frame. Full resolution renders straight to the canvas with MSAA.
@@ -160,8 +163,7 @@ function Renderer() {
       const cam = camera as PerspectiveCamera,
         step = pixelSize / gl.getPixelRatio();
       const focus = useTown.getState().focus;
-      const anchor =
-        focus === null ? new Vector3() : tiles[focus].center.clone();
+      const anchor = focus ? focusAnchor(focus) : new Vector3();
       const ndc = anchor.project(camera),
         px = ((ndc.x + 1) * size.width) / 2,
         py = ((1 - ndc.y) * size.height) / 2;
@@ -206,50 +208,74 @@ function LoadTelemetry() {
   }, [active, total, brain]);
   return null;
 }
+/**
+ * Three ways to look: the whole system, one planet, or one tile. A focused
+ * tile becomes the orbit centre with its own normal as up, so buildings can be
+ * seen from the side and up close. Left drag orbits, wheel zooms, no panning.
+ */
 function Camera() {
-  const dragging = useTown((s) => s.dragging);
-  const ref = useRef<Controls>(null!);
-  const focus = useTown((s) => s.focus);
-  const goal = useRef<Vector3 | null>(null);
+  const dragging = useTown((s) => s.dragging),
+    focus = useTown((s) => s.focus),
+    view = useTown((s) => s.view);
+  const ref = useRef<CameraControlsImpl>(null!);
   const { camera } = useThree();
   useEffect(() => {
-    goal.current =
-      focus === null
-        ? new Vector3(18, 13, 20)
-        : tiles[focus].normal.clone().multiplyScalar(RADIUS + 8);
-  }, [focus]);
-  useFrame((_, dt) => {
-    if (goal.current) {
-      const fraction = 1 - Math.exp(-dt * 4),
-        distance = camera.position.length(),
-        direction = camera.position.clone().normalize();
-      const turn = new Quaternion().setFromUnitVectors(
-        direction,
-        goal.current.clone().normalize(),
-      );
-      direction.applyQuaternion(new Quaternion().slerp(turn, fraction));
-      camera.position
-        .copy(direction)
-        .multiplyScalar(
-          distance + (goal.current.length() - distance) * fraction,
-        );
-      if (camera.position.distanceTo(goal.current) < 0.02) goal.current = null;
+    const c = ref.current;
+    c.mouseButtons.right = CameraControlsImpl.ACTION.NONE;
+    c.mouseButtons.middle = CameraControlsImpl.ACTION.DOLLY;
+    c.touches.two = CameraControlsImpl.ACTION.TOUCH_DOLLY;
+    c.touches.three = CameraControlsImpl.ACTION.NONE;
+  }, []);
+  useEffect(() => {
+    const c = ref.current;
+    if (focus) {
+      const planet = planets[focus.planet],
+        tile = planet.tiles[focus.tile],
+        target = focusAnchor(focus);
+      camera.up.copy(tile.normal);
+      c.updateCameraUp();
+      c.minDistance = 1.2;
+      c.maxDistance = 16;
+      c.minPolarAngle = 0.15;
+      c.maxPolarAngle = 1.35;
+      // Stand off along the normal and a little toward the planet's north.
+      const side = new Vector3(0, 1, 0).cross(tile.normal);
+      if (side.lengthSq() < 0.01) side.set(1, 0, 0);
+      const back = tile.normal.clone().cross(side.normalize()).normalize();
+      const eye = target
+        .clone()
+        .addScaledVector(tile.normal, 3.4)
+        .addScaledVector(back, 3.2);
+      void c.setLookAt(eye.x, eye.y, eye.z, target.x, target.y, target.z, true);
+    } else {
+      camera.up.set(0, 1, 0);
+      c.updateCameraUp();
+      c.minPolarAngle = 0;
+      c.maxPolarAngle = Math.PI;
+      const target =
+          view === "brain"
+            ? BRAIN_POS
+            : view === "factory"
+              ? FACTORY_POS
+              : new Vector3(1.5, 0, 0),
+        distance = view === "brain" ? 27 : view === "factory" ? 17 : 62;
+      c.minDistance = view === "system" ? 20 : view === "brain" ? 11 : 7;
+      c.maxDistance = 120;
+      const eye = target
+        .clone()
+        .add(new Vector3(0.35, 0.55, 1).normalize().multiplyScalar(distance));
+      void c.setLookAt(eye.x, eye.y, eye.z, target.x, target.y, target.z, true);
     }
-    ref.current?.update();
-  });
+  }, [focus, view, camera]);
   return (
-    <OrbitControls
+    <CameraControls
       ref={ref}
-      enabled={!dragging}
       makeDefault
-      enablePan={false}
-      minDistance={11}
-      maxDistance={37}
-      enableDamping
-      dampingFactor={0.07}
-      onStart={() => {
-        goal.current = null;
-      }}
+      enabled={!dragging}
+      smoothTime={0.6}
+      draggingSmoothTime={0.08}
+      dollyToCursor={false}
+      infinityDolly={false}
     />
   );
 }
@@ -262,7 +288,7 @@ function Sun() {
           24) *
         Math.PI *
         2;
-    ref.current.position.set(Math.cos(angle) * 30, 12, Math.sin(angle) * 30);
+    ref.current.position.set(Math.cos(angle) * 34, 14, Math.sin(angle) * 34);
   });
   return (
     <directionalLight
@@ -275,7 +301,7 @@ function Sun() {
     >
       <orthographicCamera
         attach="shadow-camera"
-        args={[-15, 15, 15, -15, 10, 60]}
+        args={[-26, 26, 26, -26, 8, 66]}
       />
     </directionalLight>
   );
@@ -339,7 +365,7 @@ export function PlanetScene({ children }: { children?: React.ReactNode }) {
       <ambientLight intensity={0.45} />
       <hemisphereLight args={["#b6d6f5", "#34415a", 0.9]} />
       <Sun />
-      <Stars radius={90} depth={50} count={1800} factor={2} fade speed={0} />
+      <Stars radius={130} depth={60} count={2200} factor={2.4} fade speed={0} />
       <Moons />
       <Camera />
       {children}
@@ -352,7 +378,7 @@ export function World({ children }: { children?: React.ReactNode }) {
   return (
     <Canvas
       shadows
-      camera={{ position: [18, 13, 20], fov: 42, near: 0.1, far: 250 }}
+      camera={{ position: [22, 34, 64], fov: 42, near: 0.1, far: 400 }}
       dpr={[1, 2]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
     >

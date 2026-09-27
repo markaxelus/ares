@@ -2,6 +2,29 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, the factory, the space tunnel and a camera that lands on tiles
+
+- Camera rebuilt on camera-controls. Clicking a tile on either planet lands there: the tile
+  becomes the orbit centre with its own normal as up, so buildings are seen from the side and
+  as close as 1.2 units. Explore has Everything, Knowledge planet and Factory views; Escape
+  backs out one step at a time. Panning is gone on purpose.
+- Second planet: the factory, a 362-tile industrial world at x = 17 where the robots live.
+  A conveyor belt rings it with packages riding forever, machines and robot arms work beside
+  it, cogs spin, a crane and domes mark the skyline, three charging pads glow near the gate,
+  a download scanner stands on the gate tile, relay satellites and the Ares station orbit it.
+  The knowledge planet moved to x = -14 and kept everything it had.
+- Space tunnel between the gate tiles: glass tube, light rings, pulses toward the factory,
+  glowing mouths. Agent reads send packages from the places read into the scanner and the
+  factory speeds up while it works; node additions, updates and ingestion send output back.
+- Robots rest on the charging pads and commute: Builder and Archivist ride the tunnel in a
+  capsule and walk to the job, Courier flies the shuttle to the Inbox. Trips are planned as
+  legs up front, and the activity line narrates each leg.
+- Eighteen Kenney Factory Kit and Space Station Kit models baked into `town/public/models/factory`
+  (conveyor, machines, hoppers, press, arms, scanner, screen, glass pipe, crane, cog, piston,
+  warning cone, box, floor button, container, console); `SPEC.md` and the manifest regenerated.
+- `planet.ts` takes a radius and hosts the frame helpers; `transit.ts` holds the tunnel curve
+  and package maths; `Factory.tsx` and `Tunnel.tsx` are new.
+
 ## 2026-09-27, full resolution by default, shadows, planet dressing
 
 - Full resolution is the default look. The canvas renders at its native size with 4x MSAA

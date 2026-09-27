@@ -1,5 +1,6 @@
 // Shared town state, brain polling with SSE reconnects, and placement saves.
 import { create } from "zustand";
+import type { PlanetName } from "./planet";
 import type { Brain, BrainEvent } from "./types";
 const LOOK_KEY = "ares-town.pixelSize";
 /** Pixel size remembered in this browser. Zero means full resolution. */
@@ -11,6 +12,10 @@ function savedPixelSize() {
     return 0;
   }
 }
+/** A tile the camera orbits around, on either planet. */
+export type Focus = { planet: PlanetName; tile: number };
+/** Where the camera rests when nothing is focused. */
+export type View = "system" | PlanetName;
 type State = {
   activity: string;
   builds: Record<string, number>;
@@ -18,7 +23,8 @@ type State = {
   pixelSize: number;
   fps: number;
   loadMs: number;
-  focus: number | null;
+  focus: Focus | null;
+  view: View;
   selected: string | null;
   brain: Brain | null;
   rev: string;
@@ -31,13 +37,14 @@ type State = {
   set: (v: Partial<Omit<State, "set">>) => void;
 };
 export const useTown = create<State>((set) => ({
-  activity: "Robots are exploring",
+  activity: "Robots are charging at the factory",
   builds: {},
   illuminated: {},
   pixelSize: savedPixelSize(),
   fps: 0,
   loadMs: 0,
   focus: null,
+  view: "system",
   selected: null,
   brain: null,
   rev: "",

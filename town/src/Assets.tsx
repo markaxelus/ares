@@ -1,4 +1,5 @@
-// Manifest lookup, single GLB assets, and instanced batches with drag-to-move.
+// Manifest lookup, single GLB assets, static instanced batches with drag-to-move,
+// and instanced batches whose matrices are rewritten every frame.
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader, type ThreeEvent } from "@react-three/fiber";
 import {
@@ -13,10 +14,11 @@ import {
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import manifest from "../assets/manifest.json";
-import { nearestTile, RADIUS } from "./planet";
+import { BRAIN_POS, nearestTile, RADIUS } from "./planet";
 import { moveBuilding, useTown } from "./store";
 import { layoutBrain } from "./layout";
 export const assets = new Map(manifest.entries.map((e) => [e.id, e]));
+type Entry = (typeof manifest.entries)[number];
 export type Placement = {
   key: string;
   asset: string;
@@ -27,6 +29,11 @@ export type Placement = {
   dim?: boolean;
   label?: string;
 };
+function useModel(entry: Entry) {
+  return useLoader(GLTFLoader, `/town/${entry.file}`, (loader) =>
+    loader.setMeshoptDecoder(MeshoptDecoder),
+  );
+}
 /** One placed GLB. Orbiting bodies pass shadow false so they never darken the ground. */
 export function Asset({
   id,
@@ -38,9 +45,7 @@ export function Asset({
   shadow?: boolean;
 }) {
   const entry = assets.get(id)!;
-  const gltf = useLoader(GLTFLoader, `/town/${entry.file}`, (loader) =>
-    loader.setMeshoptDecoder(MeshoptDecoder),
-  );
+  const gltf = useModel(entry);
   const clone = useMemo(() => {
     const c = gltf.scene.clone(true);
     c.traverse((o) => {
@@ -75,19 +80,18 @@ export function AssetBatches({ placements }: { placements: Placement[] }) {
     </>
   );
 }
+function meshParts(scene: Mesh["parent"] & { traverse: Mesh["traverse"] }) {
+  scene.updateMatrixWorld(true);
+  const parts: Mesh[] = [];
+  scene.traverse((o) => {
+    if ((o as Mesh).isMesh) parts.push(o as Mesh);
+  });
+  return parts;
+}
 function AssetBatch({ id, items }: { id: string; items: Placement[] }) {
   const entry = assets.get(id)!;
-  const gltf = useLoader(GLTFLoader, `/town/${entry.file}`, (loader) =>
-    loader.setMeshoptDecoder(MeshoptDecoder),
-  );
-  const meshes = useMemo(() => {
-    gltf.scene.updateMatrixWorld(true);
-    const parts: Mesh[] = [];
-    gltf.scene.traverse((o) => {
-      if ((o as Mesh).isMesh) parts.push(o as Mesh);
-    });
-    return parts;
-  }, [gltf]);
+  const gltf = useModel(entry);
+  const meshes = useMemo(() => meshParts(gltf.scene), [gltf]);
   return (
     <>
       {meshes.map((mesh, i) => (
@@ -96,34 +100,36 @@ function AssetBatch({ id, items }: { id: string; items: Placement[] }) {
     </>
   );
 }
+/** The asset's own offset and scale, applied after a placement. */
+function localMatrix(entry: Entry, mesh: Mesh) {
+  return new Matrix4()
+    .makeTranslation(0, entry.yOffset, 0)
+    .multiply(new Matrix4().makeScale(entry.scale, entry.scale, entry.scale))
+    .multiply(mesh.matrixWorld);
+}
 function Part({
   mesh,
   entry,
   items,
 }: {
   mesh: Mesh;
-  entry: (typeof manifest.entries)[number];
+  entry: Entry;
   items: Placement[];
 }) {
   const ref = useRef<InstancedMesh>(null!);
   const drag = useRef<{ id: string; x: number; y: number } | null>(null);
-  const matrices = useMemo(
-    () =>
-      items.map((p) =>
-        new Matrix4()
-          .compose(
-            p.position,
-            p.quaternion || new Quaternion(),
-            new Vector3().setScalar(p.scale || 1),
-          )
-          .multiply(new Matrix4().makeTranslation(0, entry.yOffset, 0))
-          .multiply(
-            new Matrix4().makeScale(entry.scale, entry.scale, entry.scale),
-          )
-          .multiply(mesh.matrixWorld),
-      ),
-    [items, entry, mesh],
-  );
+  const matrices = useMemo(() => {
+    const local = localMatrix(entry, mesh);
+    return items.map((p) =>
+      new Matrix4()
+        .compose(
+          p.position,
+          p.quaternion || new Quaternion(),
+          new Vector3().setScalar(p.scale || 1),
+        )
+        .multiply(local),
+    );
+  }, [items, entry, mesh]);
   useEffect(() => {
     matrices.forEach((m, i) => {
       ref.current.setMatrixAt(i, m);
@@ -143,7 +149,9 @@ function Part({
     [items],
   );
   const glow = useMemo(() => new Color("#91dcff").multiplyScalar(2.5), []);
+  const animated = useMemo(() => items.some((p) => p.nodeId), [items]);
   useFrame(() => {
+    if (!animated) return;
     const now = performance.now(),
       state = useTown.getState();
     let dirty = false;
@@ -189,15 +197,19 @@ function Part({
     ).releasePointerCapture(e.pointerId);
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) {
       const tile = nearestTile(items.find((p) => p.nodeId === d.id)!.position);
-      useTown.setState({ selected: d.id, focus: tile.id });
+      useTown.setState({
+        selected: d.id,
+        focus: { planet: "brain", tile: tile.id },
+      });
       return;
     }
+    // Buildings live on the knowledge planet, whose frame is offset in the world.
     const hit = e.ray.intersectSphere(
-      new Sphere(new Vector3(), RADIUS + 0.15),
+      new Sphere(BRAIN_POS, RADIUS + 0.15),
       new Vector3(),
     );
     if (hit) {
-      const tile = nearestTile(hit);
+      const tile = nearestTile(hit.sub(BRAIN_POS));
       if (tile.neighbors.length === 5) {
         useTown.setState({ error: "Pentagons stay ocean. Choose a hex tile." });
         return;
@@ -242,6 +254,72 @@ function Part({
         }
       }}
       onPointerOut={() => useTown.setState({ hover: null })}
+    />
+  );
+}
+/**
+ * Instances of one GLB that move: update writes the placement matrix for
+ * instance i at a time, and the asset's own offset and scale are applied after.
+ */
+export function MovingAssets({
+  id,
+  count,
+  update,
+  shadow = true,
+}: {
+  id: string;
+  count: number;
+  update: (i: number, matrix: Matrix4, time: number) => void;
+  shadow?: boolean;
+}) {
+  const entry = assets.get(id)!;
+  const gltf = useModel(entry);
+  const meshes = useMemo(() => meshParts(gltf.scene), [gltf]);
+  return (
+    <>
+      {meshes.map((mesh, i) => (
+        <MovingPart
+          key={i}
+          mesh={mesh}
+          entry={entry}
+          count={count}
+          update={update}
+          shadow={shadow}
+        />
+      ))}
+    </>
+  );
+}
+function MovingPart({
+  mesh,
+  entry,
+  count,
+  update,
+  shadow,
+}: {
+  mesh: Mesh;
+  entry: Entry;
+  count: number;
+  update: (i: number, matrix: Matrix4, time: number) => void;
+  shadow: boolean;
+}) {
+  const ref = useRef<InstancedMesh>(null!);
+  const local = useMemo(() => localMatrix(entry, mesh), [entry, mesh]);
+  const m = useMemo(() => new Matrix4(), []);
+  useFrame(({ clock }) => {
+    for (let i = 0; i < count; i++) {
+      update(i, m, clock.elapsedTime);
+      ref.current.setMatrixAt(i, m.multiply(local));
+    }
+    ref.current.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh
+      ref={ref}
+      args={[mesh.geometry, mesh.material, count]}
+      castShadow={shadow}
+      receiveShadow={shadow}
+      frustumCulled={false}
     />
   );
 }

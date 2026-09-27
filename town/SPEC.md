@@ -147,11 +147,36 @@ Scout is the Polyy low-poly radar satellite (about 5.4k triangles; the full-deta
 | `pentagon.mountain` | `Mountain001` | `town/public/models/pentagons/mountain.glb` | 0.0019 | 0 |
 | `life.dog` | `animal-dog` | `town/public/models/life/dog.glb` | 0.1389 | 0 |
 
+## Factory
+
+Kenney Factory Kit and Space Station Kit pieces for the work planet: a conveyor belt that rings the planet, machines and hoppers beside it, robot arms, the download scanner at the tunnel mouth, glass pipe for the tunnel mouths, a crane landmark, cogs, pistons, warning cones, packages, round floor buttons as robot rest pads, and station containers and consoles.
+
+| Id | Source model | File | Scale | y-offset |
+|---|---|---|---:|---:|
+| `factory.conveyor` | `conveyor-long` | `town/public/models/factory/conveyor.glb` | 0.5 | 0 |
+| `factory.machine` | `machine` | `town/public/models/factory/machine.glb` | 0.4667 | 0 |
+| `factory.machine-fortified` | `machine-fortified` | `town/public/models/factory/machine-fortified.glb` | 0.4688 | 0 |
+| `factory.press` | `machine-bed` | `town/public/models/factory/press.glb` | 0.5106 | 0 |
+| `factory.hopper` | `hopper-high-round` | `town/public/models/factory/hopper.glb` | 0.5366 | 0 |
+| `factory.arm` | `robot-arm-a` | `town/public/models/factory/arm.glb` | 0.2812 | 0 |
+| `factory.arm-b` | `robot-arm-b` | `town/public/models/factory/arm-b.glb` | 0.2833 | 0 |
+| `factory.scanner` | `scanner-high` | `town/public/models/factory/scanner.glb` | 0.451 | 0 |
+| `factory.screen` | `screen-panel-wide` | `town/public/models/factory/screen.glb` | 0.4583 | 0 |
+| `factory.pipe` | `pipe-glass-large-long` | `town/public/models/factory/pipe.glb` | 0.5 | 0 |
+| `factory.crane` | `crane` | `town/public/models/factory/crane.glb` | 0.4347 | 0 |
+| `factory.cog` | `cog-a` | `town/public/models/factory/cog.glb` | 0.5 | 0.075 |
+| `factory.piston` | `piston-round` | `town/public/models/factory/piston.glb` | 0.45 | 0 |
+| `factory.warning` | `warning-orange` | `town/public/models/factory/warning.glb` | 0.248 | 0 |
+| `factory.box` | `box-small` | `town/public/models/factory/box.glb` | 0.4706 | 0 |
+| `factory.pad` | `button-floor-round` | `town/public/models/factory/pad.glb` | 1.2 | 0 |
+| `factory.container` | `container-tall` | `town/public/models/factory/container.glb` | 0.5833 | 0 |
+| `factory.console` | `computer-system` | `town/public/models/factory/console.glb` | 0.5 | 0 |
+
 ## Optimisation
 
 Each chosen file was run through `@gltf-transform/cli` 4.5 `optimize`: dedupe, prune, meshopt, textures clamped to 512px. Simplification was left off so silhouettes stay as authored. Meshopt needs `MeshoptDecoder` at load time.
 
-Unique files: 62. Source bytes of those files and their external buffers and images: 50,524,715. Curated GLBs: 8,132,780 (7.76 MB).
+Unique files: 80. Source bytes of those files and their external buffers and images: 50,989,039. Curated GLBs: 8,546,700 (8.15 MB).
 
 | File | Before | After |
 |---|---:|---:|
@@ -217,6 +242,24 @@ Unique files: 62. Source bytes of those files and their external buffers and ima
 | `town/public/models/sky/moon-1.glb` | 72,451 | 15,804 |
 | `town/public/models/sky/moon-2.glb` | 54,397 | 13,320 |
 | `town/public/models/sky/moon-3.glb` | 62,079 | 14,620 |
+| `town/public/models/factory/conveyor.glb` | 18,688 | 22,052 |
+| `town/public/models/factory/machine.glb` | 25,620 | 23,176 |
+| `town/public/models/factory/machine-fortified.glb` | 29,828 | 23,432 |
+| `town/public/models/factory/press.glb` | 52,136 | 28,056 |
+| `town/public/models/factory/hopper.glb` | 16,644 | 21,920 |
+| `town/public/models/factory/arm.glb` | 50,592 | 24,668 |
+| `town/public/models/factory/arm-b.glb` | 44,524 | 24,848 |
+| `town/public/models/factory/scanner.glb` | 21,656 | 22,384 |
+| `town/public/models/factory/screen.glb` | 16,000 | 21,916 |
+| `town/public/models/factory/pipe.glb` | 14,976 | 22,168 |
+| `town/public/models/factory/crane.glb` | 53,396 | 27,128 |
+| `town/public/models/factory/cog.glb` | 13,660 | 21,252 |
+| `town/public/models/factory/piston.glb` | 37,736 | 31,460 |
+| `town/public/models/factory/warning.glb` | 16,136 | 22,076 |
+| `town/public/models/factory/box.glb` | 7,500 | 20,388 |
+| `town/public/models/factory/pad.glb` | 14,628 | 25,208 |
+| `town/public/models/factory/container.glb` | 13,052 | 15,352 |
+| `town/public/models/factory/console.glb` | 17,552 | 16,436 |
 
 ## Licences
 

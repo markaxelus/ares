@@ -3,11 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { World } from "./Scene";
 import { BrainWorld } from "./BrainWorld";
+import { FactoryWorld } from "./Factory";
+import { Tunnel } from "./Tunnel";
 import { Workers } from "./Robots";
-import { useTown, connectBrain } from "./store";
+import { useTown, connectBrain, type View } from "./store";
 import { breadcrumb, layoutBrain } from "./layout";
+import { factoryTiles, tiles } from "./planet";
 import type { BrainNode } from "./types";
 import "./style.css";
+const tileCount = (tiles.length + factoryTiles.length).toLocaleString("en-US");
 function App() {
   const [search, setSearch] = useState(false),
     [query, setQuery] = useState(""),
@@ -26,6 +30,8 @@ function App() {
     loadMs,
   } = useTown();
   const input = useRef<HTMLInputElement>(null);
+  const open = useRef({ search, places });
+  open.current = { search, places };
   const layout = useMemo(() => (brain ? layoutBrain(brain) : null), [brain]);
   useEffect(connectBrain, []);
   useEffect(() => {
@@ -34,10 +40,16 @@ function App() {
         e.preventDefault();
         setSearch((v) => !v);
       }
+      // Escape steps back: close what is open, then the place, then the planet.
       if (e.key === "Escape") {
-        setSearch(false);
-        setPlaces(false);
-        useTown.setState({ selected: null });
+        const s = useTown.getState();
+        if (open.current.search || open.current.places) {
+          setSearch(false);
+          setPlaces(false);
+        } else if (s.selected) useTown.setState({ selected: null });
+        else if (s.focus)
+          useTown.setState({ focus: null, view: s.focus.planet });
+        else useTown.setState({ view: "system" });
       }
     };
     window.addEventListener("keydown", key);
@@ -47,9 +59,14 @@ function App() {
     if (search) input.current?.focus();
   }, [search]);
   const select = (n: BrainNode) => {
-    const focus = layout?.positions.get(n.id);
-    if (focus !== undefined) useTown.setState({ selected: n.id, focus });
+    const tile = layout?.positions.get(n.id);
+    if (tile !== undefined && tile >= 0)
+      useTown.setState({ selected: n.id, focus: { planet: "brain", tile } });
     setSearch(false);
+    setPlaces(false);
+  };
+  const go = (view: View) => {
+    useTown.setState({ view, focus: null, selected: null });
     setPlaces(false);
   };
   const node = brain?.nodes.find((n) => n.id === selected),
@@ -60,9 +77,10 @@ function App() {
   return (
     <main data-pixels={pixelSize ? "" : undefined}>
       <World>
-        <BrainWorld allLinks={allLinks}>
-          {(layout) => <Workers layout={layout} />}
-        </BrainWorld>
+        <BrainWorld layout={layout} allLinks={allLinks} />
+        <FactoryWorld />
+        {layout && <Tunnel layout={layout} />}
+        {layout && <Workers layout={layout} />}
       </World>
       <header>
         <a href="/" title="Back to graph">
@@ -84,15 +102,15 @@ function App() {
       </header>
       {places && (
         <section className="places">
-          <h2>Your planet</h2>
-          <button
-            onClick={() => {
-              useTown.setState({ focus: null, selected: null });
-              setPlaces(false);
-            }}
-          >
-            Whole planet
+          <h2>Your system</h2>
+          <button onClick={() => go("system")}>Everything</button>
+          <button onClick={() => go("brain")}>
+            Knowledge planet<span>{brain?.nodes.length || 0} places</span>
           </button>
+          <button onClick={() => go("factory")}>
+            Factory<span>Ares HQ</span>
+          </button>
+          <h3>Regions</h3>
           {layout?.groups.map((g) => (
             <button key={g.id} onClick={() => select(g)}>
               {g.title}
@@ -256,10 +274,14 @@ function App() {
           {status === "Connected"
             ? `${brain?.nodes.length || 0} places`
             : status}
-          <span className="hint"> · Drag to orbit. Scroll to explore.</span>
+          <span className="hint">
+            {" "}
+            · Drag to orbit. Scroll to zoom. Click a tile to land. Esc backs
+            out.
+          </span>
         </span>
         <span>
-          {fps} fps <span className="hint">· 1,002 tiles</span>
+          {fps} fps <span className="hint">· {tileCount} tiles</span>
         </span>
       </footer>
     </main>

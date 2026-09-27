@@ -1,31 +1,26 @@
-// Brain to planet: building, rail and dressing placements plus per-node details.
-import { Suspense, useMemo } from "react";
-import { Quaternion, Vector3, Matrix4 } from "three";
+// Brain to planet: plates, building, rail and dressing placements and per-node
+// details, all inside the knowledge planet's group.
+import { Suspense, useCallback, useMemo } from "react";
 import { AssetBatches, assets, type Placement } from "./Assets";
-import { Plates } from "./Scene";
-import { tiles, RADIUS, nearestTile } from "./planet";
-import { layoutBrain, maturity, type Layout, hash } from "./layout";
+import { biomeColors, Plates, type PlateStyle } from "./Scene";
+import {
+  BRAIN_POS,
+  hexAligned,
+  nearestTile,
+  orientation,
+  RADIUS,
+  slerpNormal,
+  surface,
+  tiles,
+  travelFrame,
+  turned,
+  type Tile,
+} from "./planet";
+import { maturity, type Layout, hash } from "./layout";
+import { Pet } from "./Robots";
 import { useTown } from "./store";
+import { brainGate } from "./transit";
 import type { Brain, BrainNode } from "./types";
-export function surface(tile: number, height = 0.18) {
-  return tiles[tile].normal.clone().multiplyScalar(RADIUS + height);
-}
-const up = new Vector3(0, 1, 0);
-export function orientation(tile: number) {
-  return new Quaternion().setFromUnitVectors(up, tiles[tile].normal);
-}
-/** Orientation on a tile with an extra turn (radians) about the tile normal. */
-export function turned(tile: number, angle: number) {
-  return orientation(tile).multiply(
-    new Quaternion().setFromAxisAngle(up, angle),
-  );
-}
-/** Frame for a full hex tile model (Kenney kit) so its corners match the plate. */
-export function hexAligned(tile: number) {
-  return tiles[tile].quaternion
-    .clone()
-    .multiply(new Quaternion().setFromAxisAngle(up, Math.PI / 2));
-}
 export function nodeAsset(node: BrainNode, brain: Brain) {
   const growth = `growth.${node.type}.${maturity(node, brain)}`;
   return assets.has(growth)
@@ -141,30 +136,18 @@ export function railPlacements(
       to = tiles[b].normal,
       angle = Math.acos(Math.max(-1, Math.min(1, from.dot(to)))),
       steps = Math.max(2, Math.ceil((angle * RADIUS) / 0.65));
-    const point = (t: number) =>
-      Math.sin(angle) < 0.0001
-        ? from.clone().lerp(to, t).normalize()
-        : from
-            .clone()
-            .multiplyScalar(Math.sin((1 - t) * angle) / Math.sin(angle))
-            .addScaledVector(to, Math.sin(t * angle) / Math.sin(angle))
-            .normalize();
     for (let i = 0; i < steps; i++) {
       const t = (i + 0.5) / steps,
-        n = point(t),
-        tangent = point(Math.min(1, t + 0.005))
+        n = slerpNormal(from, to, t),
+        tangent = slerpNormal(from, to, Math.min(1, t + 0.005))
           .sub(n)
-          .normalize(),
-        right = n.clone().cross(tangent).normalize(),
-        forward = right.clone().cross(n).normalize();
+          .normalize();
       const ocean = !layout.owners.has(nearestTile(n).id);
       placements.push({
         key: `${edge.id}:${i}`,
         asset: ocean ? "link.bridge" : "link.rail",
         position: n.clone().multiplyScalar(RADIUS + 0.25),
-        quaternion: new Quaternion().setFromRotationMatrix(
-          new Matrix4().makeBasis(right, n, forward),
-        ),
+        quaternion: travelFrame(n, tangent, "z"),
         scale: 0.65,
         label: brain.rels[edge.rel] || edge.rel,
       });
@@ -172,16 +155,29 @@ export function railPlacements(
   }
   return placements;
 }
+const ocean: PlateStyle = { color: "#2f617b", height: -0.07 };
 export function BrainWorld({
+  layout,
   allLinks = false,
-  children,
 }: {
+  layout: Layout | null;
   allLinks?: boolean;
-  children?: (layout: Layout) => React.ReactNode;
 }) {
   const brain = useTown((s) => s.brain),
     selected = useTown((s) => s.selected);
-  const layout = useMemo(() => (brain ? layoutBrain(brain) : null), [brain]);
+  const style = useCallback(
+    (tile: Tile): PlateStyle => {
+      const owner = layout?.owners.get(tile.id);
+      return owner === undefined
+        ? ocean
+        : {
+            color: biomeColors[owner % biomeColors.length],
+            height: 0.08,
+            lighten: (layout!.patches.get(tile.id) || 0) * 0.035,
+          };
+    },
+    [layout],
+  );
   const buildings = useMemo(
     () => (brain && layout ? buildingPlacements(brain, layout) : []),
     [brain, layout],
@@ -203,6 +199,7 @@ export function BrainWorld({
       scale = 1,
       quaternion = orientation(tile),
       height?: number,
+      label?: string,
     ) => {
       if (!assets.has(asset)) return;
       placements.push({
@@ -211,6 +208,7 @@ export function BrainWorld({
         position: surface(tile, height),
         quaternion,
         scale,
+        label,
       });
       taken.add(tile);
     };
@@ -236,6 +234,17 @@ export function BrainWorld({
           turned(t.id, spin(t.id)),
           0.02,
         );
+    // The tunnel gate: a base module on the tile that faces the factory.
+    if (!occupied.has(brainGate.id))
+      put(
+        "gate",
+        "ares.base",
+        brainGate.id,
+        1,
+        orientation(brainGate.id),
+        layout.owners.has(brainGate.id) ? 0.18 : 0.02,
+        "Tunnel gate",
+      );
     const inbox = layout.positions.get("inbox");
     if (inbox !== undefined && inbox >= 0) {
       put("pad", "inbox.pad", inbox, 1, orientation(inbox), 0.19);
@@ -269,13 +278,11 @@ export function BrainWorld({
         0.09,
       );
     const ground = region("ares");
-    ["ares.dome", "ares.base", "ares.radar", "ares.rover"].forEach(
-      (asset, i) => {
-        const tile = ground[i];
-        if (tile !== undefined)
-          put(asset, asset, tile, 1, turned(tile, spin(tile)));
-      },
-    );
+    ["ares.dome", "ares.radar", "ares.rover"].forEach((asset, i) => {
+      const tile = ground[i];
+      if (tile !== undefined)
+        put(asset, asset, tile, 1, turned(tile, spin(tile)));
+    });
     for (const [tile, owner] of layout.owners) {
       const id = layout.groups[owner]?.id;
       if (!id || !free(tile)) continue;
@@ -299,31 +306,35 @@ export function BrainWorld({
     }
     return placements;
   }, [layout]);
-  if (!brain || !layout) return <Plates />;
   return (
-    <>
+    <group position={BRAIN_POS}>
       <Plates
-        owners={layout.owners}
-        patches={layout.patches}
-        onTile={(focus) =>
+        tiles={tiles}
+        style={style}
+        onTile={(tile) =>
           useTown.setState({
-            focus,
+            focus: { planet: "brain", tile },
             selected:
-              [...layout.positions].find(([, tile]) => tile === focus)?.[0] ||
+              (layout &&
+                [...layout.positions].find(([, t]) => t === tile)?.[0]) ||
               null,
           })
         }
       />
-      <Suspense fallback={null}>
-        <AssetBatches placements={[...buildings, ...dressing, ...rails]} />
-      </Suspense>
-      {brain.nodes.map((n) => {
-        const tile = layout.positions.get(n.id);
-        return tile !== undefined && tile >= 0 ? (
-          <Details key={n.id} node={n} tile={tile} />
-        ) : null;
-      })}
-      {children?.(layout)}
-    </>
+      {brain && layout && (
+        <>
+          <Suspense fallback={null}>
+            <AssetBatches placements={[...buildings, ...dressing, ...rails]} />
+          </Suspense>
+          {brain.nodes.map((n) => {
+            const tile = layout.positions.get(n.id);
+            return tile !== undefined && tile >= 0 ? (
+              <Details key={n.id} node={n} tile={tile} />
+            ) : null;
+          })}
+          <Pet layout={layout} />
+        </>
+      )}
+    </group>
   );
 }
