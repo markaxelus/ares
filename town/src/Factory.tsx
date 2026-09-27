@@ -1,8 +1,8 @@
 // The factory: Ares HQ as an industrial planet that is also a neural network.
-// Knowledge lands on the scanner, rides a belt through named stations, and
-// twelve named neurons joined by axons fire signals all the time, cascading
-// whenever a package is downloaded. Robots charge in the yard by the gate.
-import { Suspense, useCallback, useMemo, useRef } from "react";
+// Knowledge lands on the scanner and rides a belt through named stations; the
+// neurons are the brain's regions and the axons its real cross-links, firing
+// all the time and cascading on downloads. Robots charge in the yard by the gate.
+import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
   CatmullRomCurve3,
@@ -23,7 +23,7 @@ import {
   MovingAssets,
   type Placement,
 } from "./Assets";
-import { Plates, type PlateStyle } from "./Scene";
+import { biomeColors, Plates, type PlateStyle } from "./Scene";
 import {
   FACTORY_POS,
   FACTORY_RADIUS,
@@ -37,8 +37,10 @@ import {
   type Tile,
 } from "./planet";
 import { factoryGate, factoryState } from "./transit";
-import { hash } from "./layout";
+import { hash, type Layout } from "./layout";
+import { regionWeb, type RegionWeb } from "./neural";
 import { useTown } from "./store";
+import type { Brain, BrainEvent } from "./types";
 export type WorkerRole = "courier" | "builder" | "archivist";
 type Station = {
   tile: number;
@@ -47,14 +49,21 @@ type Station = {
   facing: Vector3;
   arm: boolean;
 };
-type Neuron = { tile: number; name: string; color: string };
-type Axon = { from: number; to: number; points: Vector3[]; length: number };
+type Neuron = { tile: number; region: number; color: string };
+type Axon = {
+  from: number;
+  to: number;
+  points: Vector3[];
+  length: number;
+  count: number;
+  label: string;
+};
 export type FactoryLayout = {
   gate: number;
+  core: number;
   beltTiles: Set<number>;
   stations: Station[];
-  neurons: Neuron[];
-  axons: Axon[];
+  slots: number[];
   pads: Record<WorkerRole, number>;
   cogs: number[];
   decor: Placement[];
@@ -125,22 +134,8 @@ const STATIONS: [string, string, boolean][] = [
   ["factory.machine", "Tokenizer", false],
   ["factory.screen", "Monitor", false],
 ];
-const NEURONS = [
-  "Attention",
-  "Recall",
-  "Curiosity",
-  "Planning",
-  "Memory",
-  "Language",
-  "Vision",
-  "Reasoning",
-  "Intuition",
-  "Focus",
-  "Empathy",
-  "Habit",
-];
-const NEURON_COLORS = ["#7fd0ff", "#b39dff", "#ffd27a", "#8ff0c8"];
-/** Everything sits where geometry puts it; nothing here depends on the brain. */
+const SLOTS = 12;
+/** Everything sits where geometry puts it; only the neural web reads the brain. */
 export const factoryLayout: FactoryLayout = (() => {
   const set = factoryTiles,
     gate = factoryGate.id,
@@ -264,60 +259,21 @@ export const factoryLayout: FactoryLayout = (() => {
       );
     }
   }
-  // Neurons spread evenly over the planet on a Fibonacci sphere.
-  const neurons: Neuron[] = [];
+  // Neuron slots spread evenly over the planet on a Fibonacci sphere; the
+  // brain's regions fill them in order.
+  const slots: number[] = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
-  NEURONS.forEach((name, i) => {
-    const y = 1 - (2 * (i + 0.5)) / NEURONS.length,
+  for (let i = 0; i < SLOTS; i++) {
+    const y = 1 - (2 * (i + 0.5)) / SLOTS,
       r = Math.sqrt(1 - y * y),
       phi = i * golden;
     const dir = new Vector3(r * Math.cos(phi), y, r * Math.sin(phi));
     let tile = nearestTile(dir, set).id;
     if (!free(tile)) tile = set[tile].neighbors.find(free) ?? -1;
-    if (tile < 0) return;
+    if (tile < 0) continue;
     taken.add(tile);
-    neurons.push({
-      tile,
-      name,
-      color: NEURON_COLORS[i % NEURON_COLORS.length],
-    });
-  });
-  // Axons: each neuron to its two nearest, plus the intake and the core into the web.
-  const nodes = [
-    ...neurons.map((n) => n.tile),
-    gate,
-    ...(core ? [core.tile] : []),
-  ];
-  const pairs = new Set<string>();
-  const link = (a: number, b: number) => {
-    if (a !== b) pairs.add(a < b ? `${a}:${b}` : `${b}:${a}`);
-  };
-  for (const a of nodes) {
-    const nearest = nodes
-      .filter((b) => b !== a)
-      .sort(
-        (u, v) =>
-          set[v].normal.dot(set[a].normal) - set[u].normal.dot(set[a].normal),
-      )
-      .slice(0, 2);
-    nearest.forEach((b) => link(a, b));
+    slots.push(tile);
   }
-  const axons: Axon[] = [...pairs].map((key) => {
-    const [from, to] = key.split(":").map(Number);
-    const a = set[from].normal,
-      b = set[to].normal,
-      length = Math.acos(Math.max(-1, Math.min(1, a.dot(b)))) * R;
-    const points: Vector3[] = [];
-    for (let i = 0; i <= 14; i++) {
-      const t = i / 14;
-      points.push(
-        slerpNormal(a, b, t).multiplyScalar(
-          R + 0.34 + Math.sin(t * Math.PI) * Math.min(0.5, length * 0.12),
-        ),
-      );
-    }
-    return { from, to, points, length };
-  });
   // Spinning cogs and domes on the pentagons.
   const cogs: number[] = [];
   for (const t of set) {
@@ -341,7 +297,16 @@ export const factoryLayout: FactoryLayout = (() => {
       taken.add(t.id);
     }
   }
-  return { gate, beltTiles, stations, neurons, axons, pads, cogs, decor };
+  return {
+    gate,
+    core: core?.tile ?? gate,
+    beltTiles,
+    stations,
+    slots,
+    pads,
+    cogs,
+    decor,
+  };
 })();
 const beltNeighbours = new Set<number>();
 for (const id of factoryLayout.beltTiles)
@@ -362,7 +327,21 @@ const labels: Record<WorkerRole, string> = {
   builder: "Builder",
   archivist: "Archivist",
 };
-export function FactoryWorld() {
+/**
+ * The factory planet. Geometry is fixed; the neural web is rebuilt from the brain.
+ * @param layout planet layout of the same brain, or null while it loads
+ */
+export function FactoryWorld({
+  layout,
+  brain,
+}: {
+  layout: Layout | null;
+  brain: Brain | null;
+}) {
+  const web = useMemo(
+    () => (layout && brain ? regionWeb(brain, layout) : null),
+    [layout, brain],
+  );
   const placements = useMemo(() => {
     const L = factoryLayout,
       out: Placement[] = [...L.decor];
@@ -442,7 +421,7 @@ export function FactoryWorld() {
         ))}
         <Satellites />
       </Suspense>
-      <NeuralWeb />
+      {web && layout && <NeuralWeb web={web} layout={layout} />}
       {Object.values(factoryLayout.pads).map((tile) => (
         <PadGlow key={tile} tile={tile} />
       ))}
@@ -508,21 +487,97 @@ function Cog({ tile, phase }: { tile: number; phase: number }) {
 }
 const MAX_SIGNALS = 160;
 type Signal = { axon: number; t: number; forward: boolean; speed: number };
+type Pulse = { tile: number; count: number; ms: number };
+const WRITES = new Set([
+  "node_added",
+  "node_updated",
+  "ingest_done",
+  "note",
+  "sort",
+  "link_added",
+]);
+/** An axon arching over the surface between two tiles. */
+function arch(from: number, to: number, count: number, label: string): Axon {
+  const a = factoryTiles[from].normal,
+    b = factoryTiles[to].normal,
+    length = Math.acos(Math.max(-1, Math.min(1, a.dot(b)))) * R;
+  const points: Vector3[] = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    points.push(
+      slerpNormal(a, b, t).multiplyScalar(
+        R + 0.34 + Math.sin(t * Math.PI) * Math.min(0.5, length * 0.12),
+      ),
+    );
+  }
+  return { from, to, points, length, count, label };
+}
+/**
+ * Neurons on the slots in region order, in their continent colours. Axons are
+ * the real cross-links between regions; the intake feeds the Inbox, the core
+ * joins the intake, and a region without links joins the web through the core.
+ */
+function buildWeb(web: RegionWeb) {
+  const { slots, gate, core } = factoryLayout;
+  const neurons: Neuron[] = web.regions.slice(0, slots.length).map((_, i) => ({
+    tile: slots[i],
+    region: i,
+    color: biomeColors[i % biomeColors.length],
+  }));
+  const tileOf = (region: number) => neurons[region]?.tile;
+  const axons: Axon[] = [],
+    seen = new Set<string>();
+  const add = (
+    from: number | undefined,
+    to: number | undefined,
+    count: number,
+    label: string,
+  ) => {
+    if (from === undefined || to === undefined || from === to) return;
+    const key = from < to ? `${from}:${to}` : `${to}:${from}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    axons.push(arch(from, to, count, label));
+  };
+  const plural = (n: number, word: string) =>
+    `${n} ${word}${n === 1 ? "" : "s"}`;
+  for (const l of web.links)
+    add(
+      tileOf(l.a),
+      tileOf(l.b),
+      l.count,
+      `${web.regions[l.a].title} and ${web.regions[l.b].title} · ${plural(l.count, "link")}`,
+    );
+  add(gate, tileOf(web.inbox), 1, "Intake feeds the Inbox");
+  add(core, gate, 1, "Core to the intake");
+  web.regions.forEach((r, i) => {
+    if (!r.links) add(core, tileOf(i), 1, `${r.title} joins through the core`);
+  });
+  return { neurons, axons };
+}
 /**
  * The neural web: neuron cores on pedestals, axons arching between them, and
- * signals that never stop. Idle, a few fire a second; after a download the
- * intake neuron fires and every arrival fans out, so activity ripples across
- * the whole planet while the factory is busy.
+ * signals that never stop. Idle, busier links fire more often; a brain event
+ * lights the neurons of the regions it touched and fires from them; after a
+ * download the intake fires and every arrival fans out while the factory is busy.
  */
-function NeuralWeb() {
-  const { neurons, axons, gate } = factoryLayout;
+function NeuralWeb({ web, layout }: { web: RegionWeb; layout: Layout }) {
+  const { gate } = factoryLayout;
+  const { neurons, axons } = useMemo(() => buildWeb(web), [web]);
   const geometries = useMemo(
     () =>
       axons.map(
-        (a) => new TubeGeometry(new CatmullRomCurve3(a.points), 28, 0.035, 6),
+        (a) =>
+          new TubeGeometry(
+            new CatmullRomCurve3(a.points),
+            28,
+            0.028 + 0.009 * Math.min(4, a.count - 1),
+            6,
+          ),
       ),
     [axons],
   );
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
   const byTile = useMemo(() => {
     const map = new Map<number, number[]>();
     axons.forEach((a, i) => {
@@ -531,13 +586,54 @@ function NeuralWeb() {
     });
     return map;
   }, [axons]);
+  const cumulative = useMemo(() => {
+    let sum = 0;
+    return axons.map((a) => (sum += a.count));
+  }, [axons]);
+  const neuronOfRegion = useMemo(
+    () => new Map(neurons.map((n) => [web.regions[n.region].id, n.tile])),
+    [neurons, web],
+  );
   const signals = useRef<Signal[]>([]),
     glow = useRef(new Map<number, number>()),
     spawnClock = useRef(0),
-    downloads = useRef(factoryState.downloads);
+    downloads = useRef(factoryState.downloads),
+    pulses = useRef<Pulse[]>([]),
+    lastSequence = useRef(0);
   const cores = useRef<(MeshStandardMaterial | null)[]>([]);
   const sparks = useRef<InstancedMesh>(null!);
   const dummy = useMemo(() => new Object3D(), []);
+  // Brain events pulse the neurons of the regions they touch: reads once, writes twice.
+  useEffect(() => {
+    const react = (event: BrainEvent) => {
+      const read = event.kind === "mcp_read";
+      if (read ? !event.source.startsWith("mcp:") : !WRITES.has(event.kind))
+        return;
+      const touched = new Set<number>();
+      for (const id of event.ids) {
+        const tile = neuronOfRegion.get(layout.groupOf.get(id) || "");
+        if (tile !== undefined) touched.add(tile);
+      }
+      for (const tile of touched)
+        pulses.current.push({
+          tile,
+          count: read ? 1 : 2,
+          ms: read ? 900 : 1300,
+        });
+    };
+    lastSequence.current = Number(
+      useTown.getState().events.at(-1)?.sequence || 0,
+    );
+    return useTown.subscribe((s, prev) => {
+      if (s.events === prev.events) return;
+      for (const event of s.events) {
+        const sequence = Number(event.sequence || 0);
+        if (sequence <= lastSequence.current) continue;
+        lastSequence.current = sequence;
+        react(event);
+      }
+    });
+  }, [layout, neuronOfRegion]);
   const fire = (tile: number, exclude = -1) => {
     const options = (byTile.get(tile) || []).filter((i) => i !== exclude);
     if (!options.length || signals.current.length >= MAX_SIGNALS) return;
@@ -557,12 +653,26 @@ function NeuralWeb() {
       glow.current.set(gate, now + 600);
       for (let i = 0; i < 3; i++) fire(gate);
     }
+    for (const p of pulses.current) {
+      glow.current.set(p.tile, now + p.ms);
+      for (let i = 0; i < p.count; i++) fire(p.tile);
+    }
+    pulses.current = [];
     spawnClock.current += dt;
-    const interval = busy ? 0.12 : 0.45;
+    const interval = busy ? 0.12 : 0.45,
+      total = cumulative[cumulative.length - 1] || 0;
     while (spawnClock.current > interval) {
       spawnClock.current -= interval;
-      const from = neurons[Math.floor(Math.random() * neurons.length)];
-      if (from) fire(from.tile);
+      if (!total || signals.current.length >= MAX_SIGNALS) continue;
+      const pick = Math.random() * total,
+        axon = cumulative.findIndex((c) => pick < c);
+      if (axon < 0) continue;
+      signals.current.push({
+        axon,
+        t: 0,
+        forward: Math.random() < 0.5,
+        speed: 2.4 + Math.random() * 1.2,
+      });
     }
     const alive: Signal[] = [];
     for (const s of signals.current) {
@@ -601,11 +711,16 @@ function NeuralWeb() {
   return (
     <group>
       {axons.map((a, i) => (
-        <mesh key={i} geometry={geometries[i]}>
+        <mesh
+          key={`${a.from}:${a.to}`}
+          geometry={geometries[i]}
+          onPointerOver={() => useTown.setState({ hover: a.label })}
+          onPointerOut={() => useTown.setState({ hover: null })}
+        >
           <meshStandardMaterial
             color="#5fb6ff"
             emissive="#3a8fe0"
-            emissiveIntensity={0.7}
+            emissiveIntensity={0.5 + 0.15 * Math.min(3, a.count)}
             transparent
             opacity={0.75}
           />
@@ -620,14 +735,20 @@ function NeuralWeb() {
         <meshBasicMaterial color="#dff3ff" />
       </instancedMesh>
       {neurons.map((n, i) => {
-        const tile = factoryTiles[n.tile];
+        const tile = factoryTiles[n.tile],
+          region = web.regions[n.region],
+          radius = 0.14 + 0.012 * Math.sqrt(region.places),
+          places = `${region.places} place${region.places === 1 ? "" : "s"}`,
+          links = `${region.links} link${region.links === 1 ? "" : "s"}`;
         return (
           <group
             key={n.tile}
             position={surfaceOf(tile, 0.16)}
             quaternion={orientationOf(tile)}
             onPointerOver={() =>
-              useTown.setState({ hover: `Neuron · ${n.name}` })
+              useTown.setState({
+                hover: `${region.title} · ${places} · ${links}`,
+              })
             }
             onPointerOut={() => useTown.setState({ hover: null })}
           >
@@ -636,7 +757,7 @@ function NeuralWeb() {
               <meshStandardMaterial color="#2b3038" roughness={0.6} />
             </mesh>
             <mesh position={[0, 0.42, 0]}>
-              <icosahedronGeometry args={[0.17, 1]} />
+              <icosahedronGeometry args={[radius, 1]} />
               <meshStandardMaterial
                 ref={(m) => {
                   cores.current[i] = m;
@@ -648,7 +769,7 @@ function NeuralWeb() {
               />
             </mesh>
             <mesh position={[0, 0.42, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.26, 0.014, 6, 24]} />
+              <torusGeometry args={[radius + 0.09, 0.014, 6, 24]} />
               <meshStandardMaterial
                 color="#9fd6ff"
                 emissive="#4fb3ff"

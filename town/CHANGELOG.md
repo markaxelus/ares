@@ -2,6 +2,19 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-27, the neural web is the brain's own regions
+
+- The twelve invented neurons (Attention, Recall and so on) and their nearest-neighbour axons
+  are gone. Neurons are now the brain's top-level regions, in continent order and colour, sized
+  by place count; axons are the real cross-links between regions, thicker and brighter with
+  more links. The intake feeds the Inbox, the core joins the intake, and a region without
+  cross-links joins through the core. Today that is ten neurons and eleven linked pairs, with
+  Startup path and Hackathons the busiest pair.
+- Idle signals pick axons by link weight. Agent reads light the neurons of the regions read;
+  writes pulse the regions written. Hover labels name the region with its place and link counts,
+  and each axon with the pair it joins and its link count.
+- `neural.ts` holds the pure region web with tests; `Factory.tsx` takes the layout and brain.
+
 ## 2026-09-27, an idle town no longer floods the event log
 
 - The town polled the brain every three seconds and every poll was logged as a read carrying

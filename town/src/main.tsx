@@ -79,7 +79,7 @@ function App() {
     <main data-pixels={pixelSize ? "" : undefined}>
       <World>
         <BrainWorld layout={layout} allLinks={allLinks} />
-        <FactoryWorld />
+        <FactoryWorld layout={layout} brain={brain} />
         {layout && <Tunnel layout={layout} />}
         {layout && <Workers layout={layout} />}
       </World>
