@@ -2,6 +2,19 @@
 
 One entry per change to the town. Newest first.
 
+## 2026-09-28, one pack for the whole knowledge planet
+
+- Every building, tree and mountain on the knowledge planet now comes from the KayKit Medieval
+  Hexagon Pack at one world scale (0.38), replacing a mix of twelve packs. Each type has a
+  reason: castle for the town hall, towers for goals (base, A, B as they mature), sites that
+  become workshops for projects (lumber stack, blacksmith, lumber mill), churches for beliefs,
+  archery ranges for decisions, tents under fog for questions, taverns for events, homes for
+  people, markets for environments, windmills for skills, mines for tools, open crates for notes.
+  Keepers live in the pack's second cottage. Trees alternate between the pack's two single
+  trees by region. The dock, rocks, planks, spare crate and rover are gone.
+- The curated set is 64 files, 5.2 MB. `SPEC.md`, the manifest, the inventory and `CREDITS.md`
+  were regenerated; the bake pipeline in the ignored raw folder has the new entries.
+
 ## 2026-09-27, a clean knowledge planet with keepers at work
 
 - Scatter removed: no random trees or rocks inland, no planks or spare crate at the Inbox, no

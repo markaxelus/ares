@@ -8,7 +8,6 @@ import { biomeColors, Plates, type PlateStyle } from "./Scene";
 import {
   BRAIN_POS,
   facingOf,
-  hexAligned,
   nearestTile,
   orientation,
   RADIUS,
@@ -437,9 +436,9 @@ export function BrainWorld({
       if (d.home >= 0)
         put(
           `home:${d.region}`,
-          "factory.container",
+          "keeper.home",
           d.home,
-          0.9,
+          1,
           facingOf(tiles[d.home], tiles[d.pad]),
           0.18,
           `Keeper's quarters · ${title}`,
@@ -448,21 +447,6 @@ export function BrainWorld({
     const inbox = layout.positions.get("inbox");
     if (inbox !== undefined && inbox >= 0)
       put("pad", "inbox.pad", inbox, 1, orientation(inbox), 0.19);
-    const coast = region("oceanaid")
-      .map((tile) => ({
-        tile,
-        sea: tiles[tile].neighbors.find((n) => !layout.owners.has(n)),
-      }))
-      .find((c) => c.sea !== undefined);
-    if (coast)
-      put(
-        "dock",
-        "biome.oceanaid.dock",
-        coast.tile,
-        1,
-        hexAligned(coast.tile),
-        0.09,
-      );
     // Ares launch ground: one radar mast as the landmark.
     const [mast] = region("ares");
     if (mast !== undefined)

@@ -17,76 +17,65 @@ Other models are scaled so a building footprint is about 0.55–0.72 of a tile, 
 
 ## Biomes
 
-One patch per top-level group under `me`, plus Inbox. Ocean fills the gaps. The dock model is extra dressing for OceanAID; the windmill stands in for a tree on the Skills belt; the Ares launch ground uses a Space Kit spiral tree.
+One patch per top-level group under `me`, plus Inbox. Ocean fills the gaps. Every region uses the same KayKit Medieval Hexagon buildings and trees, so the planet reads as one world; regions differ by plate colour and by what stands on them. Trees alternate between the pack's two single trees by region and stand only on shore tiles.
 
-| Group | Title | Look | Tree | Rock |
-|---|---|---|---|---|
-| `startup-path` | Startup path | Highlands | `biome.startup-path.tree` | `biome.startup-path.rock` |
-| `oceanaid` | OceanAID | Coast with a dock; dock `biome.oceanaid.dock` | `biome.oceanaid.tree` | `biome.oceanaid.rock` |
-| `uvic` | University of Victoria | Campus green | `biome.uvic.tree` | `biome.uvic.rock` |
-| `hackathons` | Hackathons | Festival ground | `biome.hackathons.tree` | `biome.hackathons.rock` |
-| `projects` | Things I built | Workshop district | `biome.projects.tree` | `biome.projects.rock` |
-| `victoria-network` | Victoria network | Harbour town | `biome.victoria-network.tree` | `biome.victoria-network.rock` |
-| `ares` | Ares | Launch ground under the station | `biome.ares.tree` | `biome.ares.rock` |
-| `self` | Self-knowledge | Forest garden | `biome.self.tree` | `biome.self.rock` |
-| `skills` | Skills | Industrial belt | `biome.skills.tree` | `biome.skills.rock` |
-| `inbox` | Inbox | Drop pad | `biome.inbox.tree` | `biome.inbox.rock` |
+| Group | Title | Look | Tree |
+|---|---|---|---|
+| `startup-path` | Startup path | Highlands | `biome.startup-path.tree` |
+| `oceanaid` | OceanAID | Coast | `biome.oceanaid.tree` |
+| `uvic` | University of Victoria | Campus green | `biome.uvic.tree` |
+| `hackathons` | Hackathons | Festival ground | `biome.hackathons.tree` |
+| `projects` | Things I built | Workshop district | `biome.projects.tree` |
+| `victoria-network` | Victoria network | Harbour town | `biome.victoria-network.tree` |
+| `ares` | Ares | Launch ground under the station | `biome.ares.tree` |
+| `self` | Self-knowledge | Forest garden | `biome.self.tree` |
+| `skills` | Skills | Mill row | `biome.skills.tree` |
+| `inbox` | Inbox | Drop pad | `biome.inbox.tree` |
 
 | Id | Source model | File | Scale | y-offset |
 |---|---|---|---:|---:|
-| `biome.startup-path.tree` | `tree_pineDefaultA` | `town/public/models/biomes/startup-path-tree.glb` | 0.6146 | 0.0307 |
-| `biome.startup-path.rock` | `stone-mountain` | `town/public/models/biomes/startup-path-rock.glb` | 1 | 0 |
-| `biome.oceanaid.tree` | `Reed001` | `town/public/models/biomes/oceanaid-tree.glb` | 0.0011 | 0 |
-| `biome.oceanaid.rock` | `rock_single_A` | `town/public/models/biomes/oceanaid-rock.glb` | 0.7378 | 0 |
-| `biome.oceanaid.dock` | `building-dock` | `town/public/models/biomes/oceanaid-dock.glb` | 1 | 0 |
-| `biome.uvic.tree` | `tree_oak` | `town/public/models/biomes/uvic-tree.glb` | 0.6932 | 0.0347 |
-| `biome.uvic.rock` | `rock_largeA` | `town/public/models/biomes/uvic-rock.glb` | 0.2757 | 0.0138 |
-| `biome.hackathons.tree` | `CommonTree_1` | `town/public/models/biomes/hackathons-tree.glb` | 0.1308 | 0.0318 |
-| `biome.hackathons.rock` | `rock_single_A` | `town/public/models/biomes/oceanaid-rock.glb` | 0.7378 | 0 |
-| `biome.projects.tree` | `tree_default` | `town/public/models/biomes/projects-tree.glb` | 0.4684 | 0.0234 |
-| `biome.projects.rock` | `rock_largeA` | `town/public/models/biomes/uvic-rock.glb` | 0.2954 | 0.0148 |
-| `biome.victoria-network.tree` | `tree_palm` | `town/public/models/biomes/victoria-network-tree.glb` | 0.5942 | 0.0297 |
-| `biome.victoria-network.rock` | `rock_largeA` | `town/public/models/biomes/uvic-rock.glb` | 0.256 | 0.0128 |
-| `biome.ares.tree` | `Tree_Spiral_1` | `town/public/models/biomes/ares-tree.glb` | 0.1336 | 0.0007 |
-| `biome.ares.rock` | `rock_A` | `town/public/models/biomes/ares-rock.glb` | 0.5253 | 0 |
-| `biome.self.tree` | `CommonTree_1` | `town/public/models/biomes/hackathons-tree.glb` | 0.1445 | 0.0351 |
-| `biome.self.rock` | `Rock_Medium_1` | `town/public/models/biomes/self-rock.glb` | 0.1085 | 0.0294 |
-| `biome.skills.tree` | `windmill` | `town/public/models/biomes/skills-tree.glb` | 0.497 | 0 |
-| `biome.skills.rock` | `rock_largeA` | `town/public/models/biomes/uvic-rock.glb` | 0.3151 | 0.0158 |
-| `biome.inbox.tree` | `TreeLow001` | `town/public/models/biomes/inbox-tree.glb` | 0.0008 | 0 |
-| `biome.inbox.rock` | `Rock001` | `town/public/models/biomes/inbox-rock.glb` | 0.0006 | 0 |
+| `biome.startup-path.tree` | `tree_single_A` | `town/public/models/biomes/startup-path-tree.glb` | 0.7523 | 0.0772 |
+| `biome.oceanaid.tree` | `tree_single_B` | `town/public/models/biomes/oceanaid-tree.glb` | 0.7421 | 0.0742 |
+| `biome.uvic.tree` | `tree_single_A` | `town/public/models/biomes/startup-path-tree.glb` | 0.7523 | 0.0772 |
+| `biome.hackathons.tree` | `tree_single_B` | `town/public/models/biomes/oceanaid-tree.glb` | 0.7421 | 0.0742 |
+| `biome.projects.tree` | `tree_single_A` | `town/public/models/biomes/startup-path-tree.glb` | 0.7523 | 0.0772 |
+| `biome.victoria-network.tree` | `tree_single_B` | `town/public/models/biomes/oceanaid-tree.glb` | 0.7421 | 0.0742 |
+| `biome.ares.tree` | `tree_single_A` | `town/public/models/biomes/startup-path-tree.glb` | 0.7523 | 0.0772 |
+| `biome.self.tree` | `tree_single_B` | `town/public/models/biomes/oceanaid-tree.glb` | 0.7421 | 0.0742 |
+| `biome.skills.tree` | `tree_single_A` | `town/public/models/biomes/startup-path-tree.glb` | 0.7523 | 0.0772 |
+| `biome.inbox.tree` | `tree_single_B` | `town/public/models/biomes/oceanaid-tree.glb` | 0.7421 | 0.0742 |
 
 ## Node types
 
-One model per type. Goals and projects also have the three growth stages below; the type entry is the mature building.
+One KayKit Medieval Hexagon building per type, all at one world scale (0.38) so sizes compare: the castle is the town hall, goals are towers, projects are workshops, beliefs are churches, decisions are archery ranges (aim taken), questions are tents under fog, events are taverns, people live in homes, environments are markets, skills are windmills, tools are mines, notes are open crates. Goals and projects also have the three growth stages below.
 
 | Id | Source model | File | Scale | y-offset |
 |---|---|---|---:|---:|
-| `node.identity` | `building_castle_blue` | `town/public/models/nodes/identity.glb` | 0.3191 | 0 |
-| `node.goal` | `WatchTower_FirstAge_Level3` | `town/public/models/nodes/goal.glb` | 0.7 | 0 |
-| `node.project` | `Barracks_FirstAge_Level3` | `town/public/models/nodes/project.glb` | 0.3 | 0.0022 |
-| `node.belief` | `statue_obelisk` | `town/public/models/nodes/belief.glb` | 0.7996 | 0.04 |
-| `node.decision` | `sign` | `town/public/models/nodes/decision.glb` | 1.1008 | 0.055 |
-| `node.question` | `Banner_1` | `town/public/models/nodes/question.glb` | 0.3135 | 0.4855 |
-| `node.event` | `building_market_blue` | `town/public/models/nodes/event.glb` | 0.3446 | 0.0019 |
-| `node.person` | `building_home_A_blue` | `town/public/models/nodes/person.glb` | 0.6443 | 0 |
-| `node.environment` | `building-a` | `town/public/models/nodes/environment.glb` | 0.5851 | 0 |
-| `node.skill` | `machine-window` | `town/public/models/nodes/skill.glb` | 0.3667 | 0 |
-| `node.tool` | `building-h` | `town/public/models/nodes/tool.glb` | 0.4691 | 0 |
-| `node.note` | `crate_open` | `town/public/models/nodes/note.glb` | 0.965 | 0.0054 |
+| `node.identity` | `building_castle_blue` | `town/public/models/nodes/identity.glb` | 0.38 | 0 |
+| `node.goal` | `building_tower_B_blue` | `town/public/models/nodes/goal.glb` | 0.38 | 0 |
+| `node.project` | `building_blacksmith_blue` | `town/public/models/nodes/project.glb` | 0.38 | 0.0019 |
+| `node.belief` | `building_church_blue` | `town/public/models/nodes/belief.glb` | 0.38 | 0 |
+| `node.decision` | `building_archeryrange_blue` | `town/public/models/nodes/decision.glb` | 0.38 | 0 |
+| `node.question` | `tent` | `town/public/models/nodes/question.glb` | 0.62 | 0 |
+| `node.event` | `building_tavern_blue` | `town/public/models/nodes/event.glb` | 0.38 | 0 |
+| `node.person` | `building_home_A_blue` | `town/public/models/nodes/person.glb` | 0.38 | 0 |
+| `node.environment` | `building_market_blue` | `town/public/models/nodes/environment.glb` | 0.38 | 0.0021 |
+| `node.skill` | `building_windmill_blue` | `town/public/models/nodes/skill.glb` | 0.38 | 0 |
+| `node.tool` | `building_mine_blue` | `town/public/models/nodes/tool.glb` | 0.38 | 0 |
+| `node.note` | `crate_open` | `town/public/models/nodes/note.glb` | 0.38 | 0.0021 |
 
 ## Growth
 
-Quaternius Ultimate Fantasy RTS first-age buildings: watchtower levels 1 to 3 for goals, barracks levels 1 to 3 for projects. Each family shares one scale so the footprint and height grow with the stage. Stage 3 is the mature node model.
+Goals rise from a tower base to tower A to tower B; projects start as a lumber stack on site, become a blacksmith, then a lumber mill. One scale for all, so growth is real height.
 
 | Id | Source model | File | Scale | y-offset |
 |---|---|---|---:|---:|
-| `growth.goal.1` | `WatchTower_FirstAge_Level1` | `town/public/models/growth/goal-1.glb` | 0.7 | 0 |
-| `growth.goal.2` | `WatchTower_FirstAge_Level2` | `town/public/models/growth/goal-2.glb` | 0.7 | 0 |
-| `growth.goal.3` | `WatchTower_FirstAge_Level3` | `town/public/models/nodes/goal.glb` | 0.7 | 0 |
-| `growth.project.1` | `Barracks_FirstAge_Level1` | `town/public/models/growth/project-1.glb` | 0.3 | 0.0022 |
-| `growth.project.2` | `Barracks_FirstAge_Level2` | `town/public/models/growth/project-2.glb` | 0.3 | 0.0022 |
-| `growth.project.3` | `Barracks_FirstAge_Level3` | `town/public/models/nodes/project.glb` | 0.3 | 0.0022 |
+| `growth.goal.1` | `building_tower_base_blue` | `town/public/models/growth/goal-1.glb` | 0.38 | 0 |
+| `growth.goal.2` | `building_tower_A_blue` | `town/public/models/growth/goal-2.glb` | 0.38 | 0 |
+| `growth.goal.3` | `building_tower_B_blue` | `town/public/models/nodes/goal.glb` | 0.38 | 0 |
+| `growth.project.1` | `resource_lumber` | `town/public/models/growth/project-1.glb` | 0.38 | 0 |
+| `growth.project.2` | `building_blacksmith_blue` | `town/public/models/nodes/project.glb` | 0.38 | 0.0019 |
+| `growth.project.3` | `building_lumbermill_blue` | `town/public/models/growth/project-3.glb` | 0.38 | 0.0013 |
 
 ## Ares station
 
@@ -104,7 +93,7 @@ Kenney station and space-kit modules share a 1-unit grid and are not scaled to a
 
 ## Robots
 
-Placeholders from the Animated Mech Pack, flat-colour variants, until the custom primitive robots exist. Each keeps its 18 to 20 animation clips (Idle, Walk, Hello, Dance and more) and is scaled to 0.35 tall. Leela is Courier, Stan is Builder, Mike is Archivist, George is Ares.
+The robots in the app are built from primitives in code. These Animated Mech Pack flat-colour models stay curated but unused; each keeps its animation clips and is scaled to 0.35 tall.
 
 | Id | Source model | File | Scale | y-offset |
 |---|---|---|---:|---:|
@@ -115,7 +104,7 @@ Placeholders from the Animated Mech Pack, flat-colour variants, until the custom
 
 ## Ares ground and sky
 
-Ultimate Space Kit pieces for the Ares biome: a geodesic dome and a base module on the launch ground, a radar mast, a shuttle that flies between the station and the Inbox pad, and a rover. Three Space Kit planets serve as moons in the sky; the app sets their scale and distance.
+Ultimate Space Kit pieces: the base module at the tunnel gate, one radar mast on the Ares ground, the shuttle that flies between the station and the Inbox pad, and the geodesic dome that caps the factory's pentagons. Three Space Kit planets serve as moons in the sky; the app sets their scale and distance.
 
 | Id | Source model | File | Scale | y-offset |
 |---|---|---|---:|---:|
@@ -123,28 +112,26 @@ Ultimate Space Kit pieces for the Ares biome: a geodesic dome and a base module 
 | `ares.base` | `Base_Large` | `town/public/models/ares/base.glb` | 0.1055 | -0.0004 |
 | `ares.radar` | `Roof_Radar` | `town/public/models/ares/radar.glb` | 0.1474 | -0.5997 |
 | `ares.shuttle` | `Spaceship_RaeTheRedPanda` | `town/public/models/ares/shuttle.glb` | 0.0537 | 0 |
-| `ares.rover` | `Rover_1` | `town/public/models/ares/rover.glb` | 0.0678 | 0.0101 |
 | `sky.moon.1` | `Planet_6` | `town/public/models/sky/moon-1.glb` | 1 | 0 |
 | `sky.moon.2` | `Planet_8` | `town/public/models/sky/moon-2.glb` | 1 | 0 |
 | `sky.moon.3` | `Planet_5` | `town/public/models/sky/moon-3.glb` | 1 | 0 |
 
-## Scout, inbox, links, pentagons
+## Scout, inbox, links, pentagons, keepers
 
-Scout is the Polyy low-poly radar satellite (about 5.4k triangles; the full-detail twin is 52–55k and was not curated). Inbox crates are KayKit. The rail is one Kenney train-kit track, 1 unit long. The bridge is the Kenney hex bridge, one tile across. The twelve pentagons share one Gobkit mountain, scaled to about 1.7 across.
+Scout is the Polyy low-poly radar satellite (about 5.4k triangles; the full-detail twin is 52–55k and was not curated). Inbox crates are KayKit. The rail is one Kenney train-kit track, 1 unit long. The bridge is the Kenney hex bridge, one tile across. The twelve pentagons share one KayKit mountain, scaled to about 1.15 across. The keeper quarters are the pack's second home.
 
 | Id | Source model | File | Scale | y-offset |
 |---|---|---|---:|---:|
 | `hex.kenney` | `grass` | `town/public/models/hex/kenney-grass.glb` | 1 | 0 |
 | `hex.kaykit` | `hex_grass` | `town/public/models/hex/kaykit-grass.glb` | 0.5 | 0 |
+| `keeper.home` | `building_home_B_blue` | `town/public/models/keepers/home.glb` | 0.38 | 0 |
 | `scout.satellite` | `11_radar_sat` | `town/public/models/orbit/scout.glb` | 0.7 | 0 |
 | `inbox.pad` | `landingpad_small` | `town/public/models/inbox/pad.glb` | 0.5 | 0 |
 | `inbox.crate` | `crate_A_big` | `town/public/models/inbox/crate.glb` | 1.3333 | 0 |
-| `inbox.crate-small` | `crate_A_small` | `town/public/models/inbox/crate-small.glb` | 1.1429 | 0 |
 | `inbox.crate-open` | `crate_open` | `town/public/models/nodes/note.glb` | 0.965 | 0.0054 |
-| `inbox.planks` | `Wood_Planks_Stack_Small` | `town/public/models/inbox/planks.glb` | 0.25 | 0.0016 |
 | `link.rail` | `track` | `town/public/models/links/rail.glb` | 1 | 0 |
 | `link.bridge` | `bridge` | `town/public/models/links/bridge.glb` | 1 | 0 |
-| `pentagon.mountain` | `Mountain001` | `town/public/models/pentagons/mountain.glb` | 0.0019 | 0 |
+| `pentagon.mountain` | `mountain_A_grass` | `town/public/models/pentagons/mountain.glb` | 0.6129 | 0 |
 | `life.dog` | `animal-dog` | `town/public/models/life/dog.glb` | 0.1389 | 0 |
 
 ## Factory
@@ -176,28 +163,29 @@ Kenney Factory Kit and Space Station Kit pieces for the work planet: a conveyor 
 
 Each chosen file was run through `@gltf-transform/cli` 4.5 `optimize`: dedupe, prune, meshopt, textures clamped to 512px. Simplification was left off so silhouettes stay as authored. Meshopt needs `MeshoptDecoder` at load time.
 
-Unique files: 80. Source bytes of those files and their external buffers and images: 50,989,039. Curated GLBs: 8,546,700 (8.15 MB).
+Unique files: 64. Source bytes of those files and their external buffers and images: 18,134,301. Curated GLBs: 5,216,012 (4.97 MB).
 
 | File | Before | After |
 |---|---:|---:|
 | `town/public/models/hex/kenney-grass.glb` | 4,680 | 18,076 |
 | `town/public/models/hex/kaykit-grass.glb` | 21,205 | 55,440 |
 | `town/public/models/nodes/identity.glb` | 336,587 | 127,596 |
-| `town/public/models/nodes/goal.glb` | 130,098 | 20,796 |
-| `town/public/models/nodes/project.glb` | 367,936 | 48,116 |
-| `town/public/models/nodes/belief.glb` | 4,416 | 3,464 |
-| `town/public/models/nodes/decision.glb` | 5,040 | 4,364 |
-| `town/public/models/nodes/question.glb` | 21,150,296 | 2,325,552 |
-| `town/public/models/nodes/event.glb` | 171,034 | 93,808 |
+| `town/public/models/nodes/goal.glb` | 151,787 | 86,048 |
+| `town/public/models/nodes/project.glb` | 141,922 | 85,804 |
+| `town/public/models/nodes/belief.glb` | 108,608 | 77,352 |
+| `town/public/models/nodes/decision.glb` | 221,245 | 104,652 |
+| `town/public/models/nodes/question.glb` | 24,939 | 56,224 |
+| `town/public/models/nodes/event.glb` | 189,724 | 100,616 |
 | `town/public/models/nodes/person.glb` | 74,221 | 69,364 |
-| `town/public/models/nodes/environment.glb` | 108,936 | 33,908 |
-| `town/public/models/nodes/skill.glb` | 38,812 | 25,832 |
-| `town/public/models/nodes/tool.glb` | 63,644 | 29,404 |
+| `town/public/models/nodes/environment.glb` | 171,034 | 93,808 |
+| `town/public/models/nodes/skill.glb` | 164,791 | 92,552 |
+| `town/public/models/nodes/tool.glb` | 84,887 | 72,352 |
 | `town/public/models/nodes/note.glb` | 30,893 | 58,284 |
-| `town/public/models/growth/goal-1.glb` | 52,593 | 10,824 |
-| `town/public/models/growth/goal-2.glb` | 71,852 | 12,984 |
-| `town/public/models/growth/project-1.glb` | 107,856 | 18,964 |
-| `town/public/models/growth/project-2.glb` | 186,323 | 31,696 |
+| `town/public/models/growth/goal-1.glb` | 100,556 | 73,860 |
+| `town/public/models/growth/goal-2.glb` | 133,690 | 81,780 |
+| `town/public/models/growth/project-1.glb` | 30,723 | 58,376 |
+| `town/public/models/growth/project-3.glb` | 189,425 | 98,092 |
+| `town/public/models/keepers/home.glb` | 100,993 | 75,148 |
 | `town/public/models/station/core.glb` | 29,828 | 15,892 |
 | `town/public/models/station/floor.glb` | 2,836 | 13,716 |
 | `town/public/models/station/wall.glb` | 9,720 | 14,780 |
@@ -208,27 +196,11 @@ Unique files: 80. Source bytes of those files and their external buffers and ima
 | `town/public/models/orbit/scout.glb` | 3,134,616 | 532,864 |
 | `town/public/models/inbox/pad.glb` | 55,300 | 70,680 |
 | `town/public/models/inbox/crate.glb` | 25,838 | 56,720 |
-| `town/public/models/inbox/crate-small.glb` | 25,842 | 56,704 |
-| `town/public/models/inbox/planks.glb` | 44,195 | 60,448 |
 | `town/public/models/links/rail.glb` | 8,464 | 21,288 |
 | `town/public/models/links/bridge.glb` | 36,344 | 23,064 |
-| `town/public/models/pentagons/mountain.glb` | 15,940 | 36,152 |
-| `town/public/models/biomes/startup-path-tree.glb` | 17,220 | 5,968 |
-| `town/public/models/biomes/startup-path-rock.glb` | 20,904 | 21,124 |
-| `town/public/models/biomes/oceanaid-tree.glb` | 16,016 | 36,176 |
-| `town/public/models/biomes/oceanaid-rock.glb` | 20,042 | 55,216 |
-| `town/public/models/biomes/oceanaid-dock.glb` | 28,980 | 22,444 |
-| `town/public/models/biomes/uvic-tree.glb` | 14,644 | 5,328 |
-| `town/public/models/biomes/uvic-rock.glb` | 7,552 | 4,068 |
-| `town/public/models/biomes/hackathons-tree.glb` | 8,933,525 | 964,260 |
-| `town/public/models/biomes/projects-tree.glb` | 9,428 | 4,380 |
-| `town/public/models/biomes/victoria-network-tree.glb` | 13,616 | 5,056 |
-| `town/public/models/biomes/ares-tree.glb` | 42,018 | 9,896 |
-| `town/public/models/biomes/ares-rock.glb` | 30,452 | 63,704 |
-| `town/public/models/biomes/self-rock.glb` | 2,532,513 | 485,516 |
-| `town/public/models/biomes/skills-tree.glb` | 46,292 | 27,592 |
-| `town/public/models/biomes/inbox-tree.glb` | 16,260 | 36,200 |
-| `town/public/models/biomes/inbox-rock.glb` | 15,756 | 36,172 |
+| `town/public/models/pentagons/mountain.glb` | 34,209 | 59,072 |
+| `town/public/models/biomes/startup-path-tree.glb` | 22,176 | 55,876 |
+| `town/public/models/biomes/oceanaid-tree.glb` | 26,207 | 57,052 |
 | `town/public/models/life/dog.glb` | 119,544 | 52,064 |
 | `town/public/models/robots/courier.glb` | 827,961 | 183,092 |
 | `town/public/models/robots/builder.glb` | 1,707,926 | 374,344 |
@@ -238,7 +210,6 @@ Unique files: 80. Source bytes of those files and their external buffers and ima
 | `town/public/models/ares/base.glb` | 164,167 | 28,832 |
 | `town/public/models/ares/radar.glb` | 52,639 | 11,208 |
 | `town/public/models/ares/shuttle.glb` | 142,993 | 22,080 |
-| `town/public/models/ares/rover.glb` | 441,623 | 63,236 |
 | `town/public/models/sky/moon-1.glb` | 72,451 | 15,804 |
 | `town/public/models/sky/moon-2.glb` | 54,397 | 13,320 |
 | `town/public/models/sky/moon-3.glb` | 62,079 | 14,620 |
